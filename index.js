@@ -150,12 +150,40 @@ qs(".upload-tray").addEventListener("click", (e) => {
   sendMessage("upload");
 })
 
+const scrollToActive = () => {
+  const container = qs(".timing-lines")
+  if (!container) return;
+  
+  let activeItem = container.querySelector(".timing-line.active")
+  
+  if (!activeItem && states.time && states.lines && states.lines.length > 0) {
+    const current = states.time.current - states.time.sync[states.activeSub]
+    let closestIdx = 0;
+    for (let i = 0; i < states.lines.length; i++) {
+      if (states.lines[i].from > current) {
+        closestIdx = i;
+        break;
+      }
+      closestIdx = i;
+    }
+    const items = qa(".timing-line")
+    if (items[closestIdx]) activeItem = items[closestIdx];
+  }
+
+  if (activeItem) {
+    activeItem.scrollIntoView({ block: "center", behavior: "smooth" })
+  }
+}
+
 Array.from(qa(".tab")).forEach(tab => {
   tab.addEventListener("click", () => {
     states.tab = tab.classList[1]
     document.body.setAttribute("data-tab", states.tab)
     if (states.tab === "timing" && lastData && lastData.data) {
         onTiming(lastData.data.subs[states.activeSub] || []);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(scrollToActive);
+        });
     }
   })
 })
@@ -168,6 +196,12 @@ qa(`input[name="activeSubTiming"], input[name="activeSubSettings"]`).forEach(rad
             onTiming(lastData.data.subs[states.activeSub] || []);
             updateSettingsUI(lastData.overlay);
             qs("#sync").value = Math.round((lastData.time.sync[states.activeSub] || 0) * 1000);
+            
+            if (states.tab === "timing") {
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(scrollToActive);
+                });
+            }
         }
     });
 });
@@ -177,6 +211,8 @@ const onTiming = lines => {
   const container = qs(".timing-lines")
   container.innerHTML = ""
   if (!lines || lines.length === 0) return;
+  
+  const fragment = document.createDocumentFragment();
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const item = document.createElement("div")
@@ -192,19 +228,24 @@ const onTiming = lines => {
       sendMessage("update", { sync: amount, subIndex: states.activeSub })
     })
     outer.appendChild(item)
-    container.appendChild(outer)
+    fragment.appendChild(outer)
+  }
+  container.appendChild(fragment)
+
+  if (states.time) {
+    onTimingUpdate(states.time);
   }
 }
 
 const onTimingUpdate = time => {
   states.time = time
   const items = qa(".timing-line")
-  if (!states.lines) return;
+  if (!states.lines || items.length === 0) return;
+  const current = time.current - time.sync[states.activeSub]
   for (let i = 0; i < states.lines.length; i++) {
     const line = states.lines[i]
     const item = items[i]
     if (!item) continue;
-    const current = time.current - time.sync[states.activeSub]
     if (line.from <= current && line.to >= current) {
       const amount = (current - line.from) / (line.to - line.from)
       item.classList.add("active")
