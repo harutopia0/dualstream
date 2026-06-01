@@ -70,7 +70,7 @@ function parseLines(text, ext) {
           cleanText = cleanText.replace(/\\[Nn]/g, "<br>").replace(/\\h/g, " ").trim()
           
           if (cleanText) {
-            output.push({ from: start, to: end, text: cleanText })
+            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText })
           }
         }
       }
@@ -90,11 +90,15 @@ function parseLines(text, ext) {
       } else if (line) {
         current.text = (current.text ? current.text + "<br>" : "") + line
       } else if (current.text) {
+        current.id = `${current.from}-${current.to}-${output.length}`;
         output.push(current)
         current = { from: 0, to: 0, text: "" }
       }
     }
-    if (current.text) output.push(current)
+    if (current.text) {
+      current.id = `${current.from}-${current.to}-${output.length}`;
+      output.push(current)
+    }
   }
   return output
 }
@@ -132,6 +136,7 @@ const applyStyle = (element, current, history = null) => {
 
 const data = { init: false, target: null, name: "none", names: [null, null], subs: [null, null] }
 const time = { current: 0, duration: 0, sync: [0, 0] }
+const activeSlots = [[], []];
 
 const overlay = {
   version: "2.6", 
@@ -175,7 +180,48 @@ const update = () => {
         if (data.subs[i]) {
             const current = time.current - time.sync[i];
             const activeLines = data.subs[i].filter(l => l.from <= current && l.to >= current);
-            const text = activeLines.length > 0 ? activeLines.map(l => l.text).join("<br>") : "";
+            
+            if (activeLines.length === 0) {
+                activeSlots[i] = [];
+            } else {
+                for (let s = 0; s < activeSlots[i].length; s++) {
+                    if (activeSlots[i][s]) {
+                        const isStillActive = activeLines.some(l => l.id === activeSlots[i][s].id);
+                        if (!isStillActive) {
+                            activeSlots[i][s] = null;
+                        }
+                    }
+                }
+
+                activeLines.forEach(l => {
+                    const isAssigned = activeSlots[i].some(s => s && s.id === l.id);
+                    if (!isAssigned) {
+                        const emptyIdx = activeSlots[i].indexOf(null);
+                        if (emptyIdx !== -1) {
+                            activeSlots[i][emptyIdx] = l;
+                        } else {
+                            activeSlots[i].push(l);
+                        }
+                    }
+                });
+
+                while (activeSlots[i].length > 0 && activeSlots[i][activeSlots[i].length - 1] === null) {
+                    activeSlots[i].pop();
+                }
+            }
+
+            let htmlParts = [];
+            if (activeSlots[i].length > 0) {
+                htmlParts = activeSlots[i].map(s => {
+                    if (s) {
+                        return `<div>${s.text}</div>`;
+                    } else {
+                        return `<div style="visibility: hidden;">&nbsp;</div>`;
+                    }
+                });
+            }
+
+            const text = [...htmlParts].reverse().join("");
             
             if (text !== "") {
                 if (overlay.inner[i].element.innerHTML !== text) {
@@ -192,6 +238,7 @@ const update = () => {
             overlay.inner[i].element.style.display = "block";
         } else {
             overlay.inner[i].element.style.display = "none";
+            activeSlots[i] = [];
         }
     }
 
