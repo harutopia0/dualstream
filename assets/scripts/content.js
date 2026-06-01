@@ -174,8 +174,8 @@ const update = () => {
     for (let i = 0; i < 2; i++) {
         if (data.subs[i]) {
             const current = time.current - time.sync[i];
-            const line = data.subs[i].find(l => l.from <= current && l.to >= current);
-            const text = line ? line.text : "";
+            const activeLines = data.subs[i].filter(l => l.from <= current && l.to >= current);
+            const text = activeLines.length > 0 ? activeLines.map(l => l.text).join("<br>") : "";
             
             if (text !== "") {
                 if (overlay.inner[i].element.innerHTML !== text) {
