@@ -1,4 +1,4 @@
-﻿const id = typeof crypto === "object" && typeof crypto.randomUUID === "function" ? `${performance.now()}-${crypto.randomUUID()}-${Math.random()}` : `${performance.now()}-${Math.random()}-${Date.now() * Math.random()}`
+const id = typeof crypto === "object" && typeof crypto.randomUUID === "function" ? `${performance.now()}-${crypto.randomUUID()}-${Math.random()}` : `${performance.now()}-${Math.random()}-${Date.now() * Math.random()}`
 function sendMessage(type, data) { chrome.runtime.sendMessage({ id, type, data }).catch(() => { }) }
 
 function parseTime(timeStr) {
@@ -20,7 +20,7 @@ function parseLines(text, ext) {
   const output = []
   
   if (ext === "ass" || ext === "ssa") {
-    let fmt = { start: 1, end: 2, text: 9 }
+    let fmt = { start: 1, end: 2, text: 9, style: -1, name: -1 }
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim()
       
@@ -29,6 +29,8 @@ function parseLines(text, ext) {
         fmt.start = cols.indexOf("Start")
         fmt.end = cols.indexOf("End")
         fmt.text = cols.indexOf("Text")
+        fmt.style = cols.indexOf("Style")
+        fmt.name = cols.indexOf("Name")
       } 
       else if (line.startsWith("Dialogue:")) {
         const dataStr = line.substring(9).trim()
@@ -39,10 +41,15 @@ function parseLines(text, ext) {
           const end = parseTime(parts[fmt.end])
           const rawText = parts.slice(fmt.text).join(",")
           
+          const style = fmt.style > -1 ? parts[fmt.style] : ""
+          const name = fmt.name > -1 ? parts[fmt.name] : ""
+          
           let isDrawing = false;
           let cleanText = "";
           let inTag = false;
           let currentTag = "";
+          let hasTopAlignTag = false;
+          let hasPosOrMoveTag = false;
           
           for (let j = 0; j < rawText.length; j++) {
             const char = rawText[j];
@@ -55,6 +62,12 @@ function parseLines(text, ext) {
                 isDrawing = true;
               } else if (/\\p0/.test(currentTag)) {
                 isDrawing = false;
+              }
+              if (/\\an[789]/.test(currentTag) || /\\a[567](?!\d)/.test(currentTag)) {
+                hasTopAlignTag = true;
+              }
+              if (/\\pos|\\move/.test(currentTag)) {
+                hasPosOrMoveTag = true;
               }
             } else {
               if (inTag) {
@@ -69,33 +82,67 @@ function parseLines(text, ext) {
           
           cleanText = cleanText.replace(/\\[Nn]/g, "<br>").replace(/\\h/g, " ").trim()
           
+          const isSignOrTitle = 
+            /sign|location|title|credit|flash|op|ed|lyrics|song|staff|note|label/i.test(style) || 
+            /sign|location|title|credit|flash|op|ed|lyrics|song|staff|note|label/i.test(name) ||
+            hasPosOrMoveTag;
+            
+          const isDialogueStyle = /^(?:default|dialogue|main|subs|spoken|vocal)?$/i.test(style.trim());
+          const isDialogueActor = name.trim() === "" || /^(?:speaker|character|voice|narrator)/i.test(name.trim());
+          
+          let isTop = false;
+          if (isSignOrTitle) {
+            isTop = true;
+          } else if (hasTopAlignTag && !(isDialogueStyle && isDialogueActor)) {
+            isTop = true;
+          }
+          
+          const isMusic = /[\u2669-\u266F]/.test(cleanText) || cleanText.includes("♪") || cleanText.includes("♫") || /lyrics|song/i.test(style) || /lyrics|song/i.test(name);
+          
           if (cleanText) {
-            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText })
+            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, isTop, isMusic })
           }
         }
       }
     }
   } else {
-    let current = { from: 0, to: 0, text: "" }
+    let current = { from: 0, to: 0, text: "", isTop: false, isMusic: false }
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim()
+      let line = lines[i].trim()
       if (line === "WEBVTT" || line.startsWith("NOTE") || line.startsWith("STYLE") || line.startsWith("REGION")) continue;
       
       if (/^\d+$/.test(line) && !line.includes("-->")) {
-        current = { from: 0, to: 0, text: "" }
+        current = { from: 0, to: 0, text: "", isTop: false, isMusic: false }
       } else if (line.includes("-->")) {
-        const [start, end] = line.split("-->").map(time => time.trim().split(" ")[0])
+        const parts = line.split("-->")
+        const start = parts[0].trim().split(" ")[0]
+        const endPart = parts[1].trim()
+        const end = endPart.split(" ")[0]
         current.from = parseTime(start)
         current.to = parseTime(end)
+        
+        if (/line:(?:[0-5]|(?:[1-2]?\d|30)%)/.test(endPart)) {
+          current.isTop = true
+        }
+        const yCoordMatch = endPart.match(/Y1:\s*(\d+)/i)
+        if (yCoordMatch && parseInt(yCoordMatch[1]) < 200) {
+          current.isTop = true
+        }
       } else if (line) {
+        if (/{\\an[789]/.test(line) || /{\\a[567](?!\d)/.test(line)) {
+          current.isTop = true
+          line = line.replace(/{\\an[789]}/g, "").replace(/{\\a[567]}/g, "")
+        }
         current.text = (current.text ? current.text + "<br>" : "") + line
       } else if (current.text) {
+        current.isMusic = /[\u2669-\u266F]/.test(current.text) || current.text.includes("♪") || current.text.includes("♫")
         current.id = `${current.from}-${current.to}-${output.length}`;
         output.push(current)
-        current = { from: 0, to: 0, text: "" }
+        current = { from: 0, to: 0, text: "", isTop: false, isMusic: false }
       }
     }
     if (current.text) {
+      current.isMusic = /[\u2669-\u266F]/.test(current.text) || current.text.includes("♪") || current.text.includes("♫")
       current.id = `${current.from}-${current.to}-${output.length}`;
       output.push(current)
     }
@@ -136,7 +183,8 @@ const applyStyle = (element, current, history = null) => {
 
 const data = { init: false, target: null, name: "none", names: [null, null], subs: [null, null] }
 const time = { current: 0, duration: 0, sync: [0, 0] }
-const activeSlots = [[], []];
+const activeSlotsDialogue = [[], []];
+const activeSlotsSpecial = [[], []];
 
 const overlay = {
   version: "2.6", 
@@ -181,38 +229,76 @@ const update = () => {
             const current = time.current - time.sync[i];
             const activeLines = data.subs[i].filter(l => l.from <= current && l.to >= current);
             
-            if (activeLines.length === 0) {
-                activeSlots[i] = [];
+            const activeDialogue = activeLines.filter(l => !(l.isTop || l.isMusic));
+            const activeSpecial = activeLines.filter(l => (l.isTop || l.isMusic));
+            
+            // Manage dialogue slots
+            if (activeDialogue.length === 0 && activeSpecial.length === 0) {
+                activeSlotsDialogue[i] = [];
             } else {
-                for (let s = 0; s < activeSlots[i].length; s++) {
-                    if (activeSlots[i][s]) {
-                        const isStillActive = activeLines.some(l => l.id === activeSlots[i][s].id);
+                for (let s = 0; s < activeSlotsDialogue[i].length; s++) {
+                    if (activeSlotsDialogue[i][s]) {
+                        const isStillActive = activeDialogue.some(l => l.id === activeSlotsDialogue[i][s].id);
                         if (!isStillActive) {
-                            activeSlots[i][s] = null;
+                            activeSlotsDialogue[i][s] = null;
                         }
                     }
                 }
 
-                activeLines.forEach(l => {
-                    const isAssigned = activeSlots[i].some(s => s && s.id === l.id);
+                activeDialogue.forEach(l => {
+                    const isAssigned = activeSlotsDialogue[i].some(s => s && s.id === l.id);
                     if (!isAssigned) {
-                        const emptyIdx = activeSlots[i].indexOf(null);
+                        const emptyIdx = activeSlotsDialogue[i].indexOf(null);
                         if (emptyIdx !== -1) {
-                            activeSlots[i][emptyIdx] = l;
+                            activeSlotsDialogue[i][emptyIdx] = l;
                         } else {
-                            activeSlots[i].push(l);
+                            activeSlotsDialogue[i].push(l);
                         }
                     }
                 });
 
-                while (activeSlots[i].length > 0 && activeSlots[i][activeSlots[i].length - 1] === null) {
-                    activeSlots[i].pop();
+                if (activeDialogue.length > 0) {
+                    while (activeSlotsDialogue[i].length > 0 && activeSlotsDialogue[i][activeSlotsDialogue[i].length - 1] === null) {
+                        activeSlotsDialogue[i].pop();
+                    }
                 }
             }
 
-            let htmlParts = [];
-            if (activeSlots[i].length > 0) {
-                htmlParts = activeSlots[i].map(s => {
+            // Manage special slots
+            if (activeSpecial.length === 0 && activeDialogue.length === 0) {
+                activeSlotsSpecial[i] = [];
+            } else {
+                for (let s = 0; s < activeSlotsSpecial[i].length; s++) {
+                    if (activeSlotsSpecial[i][s]) {
+                        const isStillActive = activeSpecial.some(l => l.id === activeSlotsSpecial[i][s].id);
+                        if (!isStillActive) {
+                            activeSlotsSpecial[i][s] = null;
+                        }
+                    }
+                }
+
+                activeSpecial.forEach(l => {
+                    const isAssigned = activeSlotsSpecial[i].some(s => s && s.id === l.id);
+                    if (!isAssigned) {
+                        const emptyIdx = activeSlotsSpecial[i].indexOf(null);
+                        if (emptyIdx !== -1) {
+                            activeSlotsSpecial[i][emptyIdx] = l;
+                        } else {
+                            activeSlotsSpecial[i].push(l);
+                        }
+                    }
+                });
+
+                if (activeSpecial.length > 0) {
+                    while (activeSlotsSpecial[i].length > 0 && activeSlotsSpecial[i][activeSlotsSpecial[i].length - 1] === null) {
+                        activeSlotsSpecial[i].pop();
+                    }
+                }
+            }
+
+            let dialogueParts = [];
+            if (activeSlotsDialogue[i].length > 0) {
+                dialogueParts = activeSlotsDialogue[i].map(s => {
                     if (s) {
                         return `<div>${s.text}</div>`;
                     } else {
@@ -221,7 +307,20 @@ const update = () => {
                 });
             }
 
-            const text = [...htmlParts].reverse().join("");
+            let specialParts = [];
+            if (activeSlotsSpecial[i].length > 0) {
+                specialParts = activeSlotsSpecial[i].map(s => {
+                    if (s) {
+                        const musicStyle = s.isMusic ? 'font-style: italic;' : '';
+                        return `<div style="${musicStyle}">${s.text}</div>`;
+                    } else {
+                        return `<div style="visibility: hidden;">&nbsp;</div>`;
+                    }
+                });
+            }
+
+            const combinedParts = [...dialogueParts, ...specialParts];
+            const text = [...combinedParts].reverse().join("");
             
             if (text !== "") {
                 if (overlay.inner[i].element.innerHTML !== text) {
@@ -238,7 +337,8 @@ const update = () => {
             overlay.inner[i].element.style.display = "block";
         } else {
             overlay.inner[i].element.style.display = "none";
-            activeSlots[i] = [];
+            activeSlotsDialogue[i] = [];
+            activeSlotsSpecial[i] = [];
         }
     }
 
@@ -357,6 +457,8 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     time.sync[idx] = 0;
     overlay.inner[idx].element.style.display = "none";
     overlay.inner[idx].element.innerHTML = "";
+    activeSlotsDialogue[idx] = [];
+    activeSlotsSpecial[idx] = [];
     
     data.name = data.names.filter(Boolean).join(" & ") || "none"
     if (data.names.filter(Boolean).length === 0) {
@@ -374,6 +476,10 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     data.names = [null, null]
     data.subs = [null, null]
     time.sync = [0, 0]
+    for (let i = 0; i < 2; i++) {
+      activeSlotsDialogue[i] = [];
+      activeSlotsSpecial[i] = [];
+    }
     sendMessage("data", { data, time, overlay })
   } else if (action === "time") {
     sendMessage("time", { time })
