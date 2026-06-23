@@ -83,8 +83,8 @@ function parseLines(text, ext) {
           cleanText = cleanText.replace(/\\[Nn]/g, "<br>").replace(/\\h/g, " ").trim()
           
           const isSignOrTitle = 
-            /sign|location|title|credit|flash|op|ed|lyrics|song|staff|note|label/i.test(style) || 
-            /sign|location|title|credit|flash|op|ed|lyrics|song|staff|note|label/i.test(name) ||
+            /sign|location|title|credit|flash|staff|note|label/i.test(style) || 
+            /sign|location|title|credit|flash|staff|note|label/i.test(name) ||
             hasPosOrMoveTag;
             
           const isDialogueStyle = /^(?:default|dialogue|main|subs|spoken|vocal)?$/i.test(style.trim());
@@ -97,7 +97,8 @@ function parseLines(text, ext) {
             isTop = true;
           }
           
-          const isMusic = /[\u2669-\u266F]/.test(cleanText) || cleanText.includes("♪") || cleanText.includes("♫") || /lyrics|song/i.test(style) || /lyrics|song/i.test(name);
+          const musicKeywordRegex = /(?:^|[^a-zA-Z])(?:op|ed\d*|opening|ending|lyrics|song|vocal|theme)(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:op|ed)\d*(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:op|ed)\d*(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:$|[^a-zA-Z])/i;
+          const isMusic = /[\u2669-\u266F]/.test(cleanText) || cleanText.includes("♪") || cleanText.includes("♫") || musicKeywordRegex.test(style) || musicKeywordRegex.test(name);
           
           if (cleanText) {
             output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, isTop, isMusic })
@@ -180,6 +181,76 @@ const applyStyle = (element, current, history = null) => {
     }
   }
 }
+
+const hexToRgba = (hex, opacity) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
+const updateSvgBorders = (parent) => {
+  const svgs = parent.querySelectorAll('.ds-border-svg');
+  for (let j = 0; j < svgs.length; j++) {
+    const svg = svgs[j];
+    const container = svg.parentElement;
+    if (!container) continue;
+    const w = container.offsetWidth;
+    const h = container.offsetHeight;
+    if (w === 0 || h === 0) continue;
+    
+    const currentW = svg.getAttribute('width');
+    const currentH = svg.getAttribute('height');
+    if (currentW === `${w}` && currentH === `${h}`) continue;
+    
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    
+    const pathOuter = svg.querySelector('.path-outer');
+    const pathMiddle = svg.querySelector('.path-middle');
+    const pathInner = svg.querySelector('.path-inner');
+    
+    const pathMusicBg = svg.querySelector('.path-music-bg');
+    const pathMusicTopOuter = svg.querySelector('.path-music-top-outer');
+    const pathMusicTopInner = svg.querySelector('.path-music-top-inner');
+    const pathMusicBottomOuter = svg.querySelector('.path-music-bottom-outer');
+    const pathMusicBottomInner = svg.querySelector('.path-music-bottom-inner');
+    const noteLeft = svg.querySelector('.note-group-left');
+    const noteRight = svg.querySelector('.note-group-right');
+    
+    if (pathOuter) {
+      pathOuter.setAttribute('d', `M 14,2 L ${w - 14},2 L ${w - 14},6 A 8,8 0 0,0 ${w - 6},14 L ${w - 2},14 L ${w - 2},${h - 14} L ${w - 6},${h - 14} A 8,8 0 0,0 ${w - 14},${h - 6} L ${w - 14},${h - 2} L 14,${h - 2} L 14,${h - 6} A 8,8 0 0,0 6,${h - 14} L 2,${h - 14} L 2,14 L 6,14 A 8,8 0 0,0 14,6 L 14,2 Z`);
+    }
+    if (pathMiddle) {
+      pathMiddle.setAttribute('d', `M 16,4 L ${w - 16},4 L ${w - 16},8 A 8,8 0 0,0 ${w - 8},16 L ${w - 4},16 L ${w - 4},${h - 16} L ${w - 8},${h - 16} A 8,8 0 0,0 ${w - 16},${h - 8} L ${w - 16},${h - 4} L 16,${h - 4} L 16,${h - 8} A 8,8 0 0,0 8,${h - 16} L 4,${h - 16} L 4,16 L 8,16 A 8,8 0 0,0 16,8 L 16,4 Z`);
+    }
+    if (pathInner) {
+      pathInner.setAttribute('d', `M 22,10 L ${w - 22},10 L ${w - 22},14 A 8,8 0 0,0 ${w - 14},22 L ${w - 10},22 L ${w - 10},${h - 22} L ${w - 14},${h - 22} A 8,8 0 0,0 ${w - 22},${h - 14} L ${w - 22},${h - 10} L 22,${h - 10} L 22,${h - 14} A 8,8 0 0,0 14,${h - 22} L 10,${h - 22} L 10,22 L 14,22 A 8,8 0 0,0 22,14 L 22,10 Z`);
+    }
+    
+    if (pathMusicBg) {
+      pathMusicBg.setAttribute('d', `M 12,2 L ${w - 12},2 A 10,10 0 0,1 ${w - 2},12 L ${w - 2},${h - 12} A 10,10 0 0,1 ${w - 12},${h - 2} L 12,${h - 2} A 10,10 0 0,1 2,${h - 12} L 2,12 A 10,10 0 0,1 12,2 Z`);
+      if (pathMusicTopOuter) {
+        pathMusicTopOuter.setAttribute('d', `M 12,2 L ${w - 12},2`);
+      }
+      if (pathMusicTopInner) {
+        pathMusicTopInner.setAttribute('d', `M 14,6 L ${w - 14},6`);
+      }
+      if (pathMusicBottomOuter) {
+        pathMusicBottomOuter.setAttribute('d', `M 12,${h - 2} L ${w - 12},${h - 2}`);
+      }
+      if (pathMusicBottomInner) {
+        pathMusicBottomInner.setAttribute('d', `M 14,${h - 6} L ${w - 14},${h - 6}`);
+      }
+    }
+    if (noteLeft) {
+      noteLeft.setAttribute('transform', `translate(18, ${h / 2})`);
+    }
+    if (noteRight) {
+      noteRight.setAttribute('transform', `translate(${w - 18}, ${h / 2})`);
+    }
+  }
+};
 
 const data = { init: false, target: null, name: "none", names: [null, null], subs: [null, null] }
 const time = { current: 0, duration: 0, sync: [0, 0] }
@@ -296,6 +367,58 @@ const update = () => {
                 }
             }
 
+            const colorsSignboard = [
+                { border: '#423ee0', bg: '#423ee0', bgOpacity: 0.15 }, // Sub 1: Original Blue/Indigo
+                { border: '#9b8ff3', bg: '#9b8ff3', bgOpacity: 0.20 }  // Sub 2: Original Lavender/Purple
+            ];
+            const colorsMusic = [
+                { border: '#ff9f1c', bg: '#ff9f1c', bgOpacity: 0.04 }, // Sub 1: Warm Amber/Orange
+                { border: '#ffb703', bg: '#ffb703', bgOpacity: 0.05 }  // Sub 2: Solar Yellow/Amber
+            ];
+            const colorSign = colorsSignboard[i];
+            const colorMusic = colorsMusic[i];
+
+            const createSvgMarkup = () => {
+                return `<svg class="ds-border-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.35)); display: block; margin: 0; padding: 0;"><path class="path-outer" fill="${colorSign.bg}" fill-opacity="${colorSign.bgOpacity}" stroke="${colorSign.border}" stroke-opacity="0.5" stroke-width="0.8" /><path class="path-middle" fill="none" stroke="${colorSign.border}" stroke-opacity="0.95" stroke-width="2.2" /><path class="path-inner" fill="none" stroke="${colorSign.border}" stroke-opacity="0.75" stroke-width="1.0" /></svg>`;
+            };
+
+            const gradId = `ds-music-grad-${i}-${id}`;
+            const glowId = `ds-music-glow-${i}-${id}`;
+            const createMusicSvgMarkup = () => {
+                return `<svg class="ds-border-svg music" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 2px 5px rgba(0,0,0,0.65)); display: block; margin: 0; padding: 0;">` +
+                    `<defs>` +
+                        `<linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">` +
+                            `<stop offset="0%" stop-color="${colorMusic.bg}" stop-opacity="0.00" />` +
+                            `<stop offset="15%" stop-color="${colorMusic.bg}" stop-opacity="0.05" />` +
+                            `<stop offset="50%" stop-color="${colorMusic.bg}" stop-opacity="0.10" />` +
+                            `<stop offset="85%" stop-color="${colorMusic.bg}" stop-opacity="0.05" />` +
+                            `<stop offset="100%" stop-color="${colorMusic.bg}" stop-opacity="0.00" />` +
+                        `</linearGradient>` +
+                        `<filter id="${glowId}" x="-50%" y="-50%" width="200%" height="200%">` +
+                            `<feGaussianBlur stdDeviation="3.0" result="coloredBlur"/>` +
+                            `<feMerge>` +
+                                `<feMergeNode in="coloredBlur"/>` +
+                                `<feMergeNode in="coloredBlur"/>` +
+                                `<feMergeNode in="SourceGraphic"/>` +
+                            `</feMerge>` +
+                        `</filter>` +
+                    `</defs>` +
+                    `<path class="path-music-bg" fill="url(#${gradId})" stroke="none" />` +
+                    `<path class="path-music-top-outer" fill="none" stroke="${colorMusic.border}" stroke-opacity="0.90" stroke-width="3.2" filter="url(#${glowId})" />` +
+                    `<path class="path-music-top-inner" fill="none" stroke="${colorMusic.border}" stroke-opacity="0.60" stroke-width="1.6" />` +
+                    `<path class="path-music-bottom-outer" fill="none" stroke="${colorMusic.border}" stroke-opacity="0.90" stroke-width="3.2" filter="url(#${glowId})" />` +
+                    `<path class="path-music-bottom-inner" fill="none" stroke="${colorMusic.border}" stroke-opacity="0.60" stroke-width="1.6" />` +
+                    `<g class="note-group-left">` +
+                        `<circle class="note-glow-left" r="13" fill="${colorMusic.border}" fill-opacity="0.15" filter="url(#${glowId})" />` +
+                        `<text font-size="22" font-family="system-ui, sans-serif" font-weight="bold" dominant-baseline="central" text-anchor="middle" fill="#ffffff" style="text-shadow: 0 0 4px ${colorMusic.border};">♪</text>` +
+                    `</g>` +
+                    `<g class="note-group-right">` +
+                        `<circle class="note-glow-right" r="13" fill="${colorMusic.border}" fill-opacity="0.15" filter="url(#${glowId})" />` +
+                        `<text font-size="22" font-family="system-ui, sans-serif" font-weight="bold" dominant-baseline="central" text-anchor="middle" fill="#ffffff" style="text-shadow: 0 0 4px ${colorMusic.border};">♫</text>` +
+                    `</g>` +
+                `</svg>`;
+            };
+
             let dialogueParts = [];
             if (activeSlotsDialogue[i].length > 0) {
                 dialogueParts = activeSlotsDialogue[i].map(s => {
@@ -311,8 +434,13 @@ const update = () => {
             if (activeSlotsSpecial[i].length > 0) {
                 specialParts = activeSlotsSpecial[i].map(s => {
                     if (s) {
-                        const musicStyle = s.isMusic ? 'font-style: italic;' : '';
-                        return `<div style="${musicStyle}">${s.text}</div>`;
+                        if (s.isMusic) {
+                            const musicBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 12px 36px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic;`;
+                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special music" style="${musicBoxStyle}">${createMusicSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
+                        } else {
+                            const specialBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 28px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important;`;
+                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special" style="${specialBoxStyle}">${createSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
+                        }
                     } else {
                         return `<div style="visibility: hidden;">&nbsp;</div>`;
                     }
@@ -327,6 +455,7 @@ const update = () => {
                     overlay.inner[i].element.innerHTML = text;
                 }
                 overlay.inner[i].element.style.visibility = "visible";
+                updateSvgBorders(overlay.inner[i].element);
             } else {
                 if (overlay.inner[i].element.innerHTML !== "&nbsp;") {
                     overlay.inner[i].element.innerHTML = "&nbsp;";
