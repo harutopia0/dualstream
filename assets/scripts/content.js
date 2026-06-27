@@ -123,15 +123,14 @@ function parseLines(text, ext) {
         current.to = parseTime(end)
         
         if (/line:(?:[0-5]|(?:[1-2]?\d|30)%)/.test(endPart)) {
-          current.isTop = true
+          // Keep normal dialogue styling (no signboard border)
         }
         const yCoordMatch = endPart.match(/Y1:\s*(\d+)/i)
         if (yCoordMatch && parseInt(yCoordMatch[1]) < 200) {
-          current.isTop = true
+          // Keep normal dialogue styling (no signboard border)
         }
       } else if (line) {
         if (/{\\an[789]/.test(line) || /{\\a[567](?!\d)/.test(line)) {
-          current.isTop = true
           line = line.replace(/{\\an[789]}/g, "").replace(/{\\a[567]}/g, "")
         }
         current.text = (current.text ? current.text + "<br>" : "") + line
