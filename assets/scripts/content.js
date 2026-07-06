@@ -82,26 +82,34 @@ function parseLines(text, ext) {
           
           cleanText = cleanText.replace(/\\[Nn]/g, "<br>").replace(/\\h/g, " ").trim()
           
-          const isSignOrTitle = 
-            /sign|location|title|credit|flash|staff|note|label/i.test(style) || 
-            /sign|location|title|credit|flash|staff|note|label/i.test(name) ||
-            hasPosOrMoveTag;
-            
+          const musicStyleRegex = /^(?:op|ed\d*|opening|ending|lyrics?|songs?|vocals?|theme|music|romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn|karaoke|singers?)(?:\s+alt|\s+italic)?$/i;
+          const musicKeywordRegex = /(?:^|[^a-zA-Z])(?:op|ed\d*|opening|ending|lyrics|song|vocal|theme)(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:op|ed)\d*(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:op|ed)\d*(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:$|[^a-zA-Z])|lyrics|karaoke|singer/i;
+          const flashbackStyleRegex = /flashback|fb/i;
+          const deviceStyleRegex = /phone|radio|tv|speaker|device|transmitter|comm|intercom|megaphone|robot/i;
+          const whisperStyleRegex = /whisper|low|murmur|quiet/i;
+          const signStyleRegex = /sign|location|title|credit|flash|staff|note|label|caption|screen|text|card|insert/i;
+          const thoughtStyleRegex = /italic|thoughts?|internal|monologue|offscreen|os\b|behind|voiceover|vo\b/i;
+
+          const isFlashback = flashbackStyleRegex.test(style) || flashbackStyleRegex.test(name);
+          const isDevice = deviceStyleRegex.test(style) || deviceStyleRegex.test(name);
+          const isWhisper = whisperStyleRegex.test(style) || whisperStyleRegex.test(name);
+          const isItalic = thoughtStyleRegex.test(style) || thoughtStyleRegex.test(name);
+          
+          const isMusic = /[\u2669-\u266F]/.test(cleanText) || cleanText.includes("♪") || cleanText.includes("♫") || musicStyleRegex.test(style) || musicKeywordRegex.test(style) || musicStyleRegex.test(name) || musicKeywordRegex.test(name);
+          const isSignOrTitle = signStyleRegex.test(style) || signStyleRegex.test(name) || hasPosOrMoveTag;
+          
           const isDialogueStyle = /^(?:default|dialogue|main|subs|spoken|vocal)?$/i.test(style.trim());
           const isDialogueActor = name.trim() === "" || /^(?:speaker|character|voice|narrator)/i.test(name.trim());
           
           let isTop = false;
-          if (isSignOrTitle) {
+          if (isSignOrTitle || isFlashback || isDevice || isWhisper) {
             isTop = true;
           } else if (hasTopAlignTag && !(isDialogueStyle && isDialogueActor)) {
             isTop = true;
           }
           
-          const musicKeywordRegex = /(?:^|[^a-zA-Z])(?:op|ed\d*|opening|ending|lyrics|song|vocal|theme)(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:op|ed)\d*(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:op|ed)\d*(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:$|[^a-zA-Z])/i;
-          const isMusic = /[\u2669-\u266F]/.test(cleanText) || cleanText.includes("♪") || cleanText.includes("♫") || musicKeywordRegex.test(style) || musicKeywordRegex.test(name);
-          
           if (cleanText) {
-            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, isTop, isMusic })
+            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, isTop, isMusic, isFlashback, isDevice, isWhisper, isItalic })
           }
         }
       }
@@ -135,14 +143,74 @@ function parseLines(text, ext) {
         }
         current.text = (current.text ? current.text + "<br>" : "") + line
       } else if (current.text) {
-        current.isMusic = /[\u2669-\u266F]/.test(current.text) || current.text.includes("♪") || current.text.includes("♫")
+        let isFlashback = false;
+        let isDevice = false;
+        let isWhisper = false;
+        let isItalic = false;
+        let cleanText = current.text;
+        
+        if (/^\s*<i>?\s*[\[\(\{](?:flashback|fb)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
+          cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:flashback|fb)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
+          isFlashback = true;
+        }
+        if (/^\s*<i>?\s*[\[\(\{](?:phone|radio|tv|device|comm)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
+          cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:phone|radio|tv|device|comm)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
+          isDevice = true;
+        }
+        if (/^\s*<i>?\s*[\[\(\{](?:whisper|low|murmur|quiet)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
+          cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:whisper|low|murmur|quiet)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
+          isWhisper = true;
+        }
+        if (/^\s*<i>?\s*[\[\(\{](?:italic|thought|monologue|offscreen|os|vo)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
+          cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:italic|thought|monologue|offscreen|os|vo)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
+          isItalic = true;
+        }
+        
+        current.text = cleanText.trim();
+        current.isMusic = /[\u2669-\u266F]/.test(current.text) || current.text.includes("♪") || current.text.includes("♫");
+        current.isFlashback = isFlashback;
+        current.isDevice = isDevice;
+        current.isWhisper = isWhisper;
+        current.isItalic = isItalic || (current.text.startsWith("<i>") && current.text.endsWith("</i>"));
+        current.isTop = current.isTop || isFlashback || isDevice || isWhisper;
+        
         current.id = `${current.from}-${current.to}-${output.length}`;
         output.push(current)
         current = { from: 0, to: 0, text: "", isTop: false, isMusic: false }
       }
     }
     if (current.text) {
-      current.isMusic = /[\u2669-\u266F]/.test(current.text) || current.text.includes("♪") || current.text.includes("♫")
+      let isFlashback = false;
+      let isDevice = false;
+      let isWhisper = false;
+      let isItalic = false;
+      let cleanText = current.text;
+      
+      if (/^\s*<i>?\s*[\[\(\{](?:flashback|fb)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
+        cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:flashback|fb)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
+        isFlashback = true;
+      }
+      if (/^\s*<i>?\s*[\[\(\{](?:phone|radio|tv|device|comm)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
+        cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:phone|radio|tv|device|comm)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
+        isDevice = true;
+      }
+      if (/^\s*<i>?\s*[\[\(\{](?:whisper|low|murmur|quiet)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
+        cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:whisper|low|murmur|quiet)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
+        isWhisper = true;
+      }
+      if (/^\s*<i>?\s*[\[\(\{](?:italic|thought|monologue|offscreen|os|vo)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
+        cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:italic|thought|monologue|offscreen|os|vo)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
+        isItalic = true;
+      }
+      
+      current.text = cleanText.trim();
+      current.isMusic = /[\u2669-\u266F]/.test(current.text) || current.text.includes("♪") || current.text.includes("♫");
+      current.isFlashback = isFlashback;
+      current.isDevice = isDevice;
+      current.isWhisper = isWhisper;
+      current.isItalic = isItalic || (current.text.startsWith("<i>") && current.text.endsWith("</i>"));
+      current.isTop = current.isTop || isFlashback || isDevice || isWhisper;
+      
       current.id = `${current.from}-${current.to}-${output.length}`;
       output.push(current)
     }
@@ -216,6 +284,9 @@ const updateSvgBorders = (parent) => {
     const pathMusicBottomInner = svg.querySelector('.path-music-bottom-inner');
     const noteLeft = svg.querySelector('.note-group-left');
     const noteRight = svg.querySelector('.note-group-right');
+
+    const sprocketsL = svg.querySelectorAll('.fb-sprocket-l');
+    const sprocketsR = svg.querySelectorAll('.fb-sprocket-r');
     
     if (pathOuter) {
       pathOuter.setAttribute('d', `M 14,2 L ${w - 14},2 L ${w - 14},6 A 8,8 0 0,0 ${w - 6},14 L ${w - 2},14 L ${w - 2},${h - 14} L ${w - 6},${h - 14} A 8,8 0 0,0 ${w - 14},${h - 6} L ${w - 14},${h - 2} L 14,${h - 2} L 14,${h - 6} A 8,8 0 0,0 6,${h - 14} L 2,${h - 14} L 2,14 L 6,14 A 8,8 0 0,0 14,6 L 14,2 Z`);
@@ -247,6 +318,21 @@ const updateSvgBorders = (parent) => {
     }
     if (noteRight) {
       noteRight.setAttribute('transform', `translate(${w - 18}, ${h / 2})`);
+    }
+
+    if (sprocketsL.length > 0) {
+      for (let k = 0; k < sprocketsL.length; k++) {
+        const yVal = h / 2 - 17 + k * 13;
+        sprocketsL[k].setAttribute('y', yVal);
+        sprocketsL[k].setAttribute('x', 14);
+      }
+    }
+    if (sprocketsR.length > 0) {
+      for (let k = 0; k < sprocketsR.length; k++) {
+        const yVal = h / 2 - 17 + k * 13;
+        sprocketsR[k].setAttribute('y', yVal);
+        sprocketsR[k].setAttribute('x', w - 20);
+      }
     }
   }
 };
@@ -374,8 +460,23 @@ const update = () => {
                 { border: '#ff9f1c', bg: '#ff9f1c', bgOpacity: 0.04 }, // Sub 1: Warm Amber/Orange
                 { border: '#ffb703', bg: '#ffb703', bgOpacity: 0.05 }  // Sub 2: Solar Yellow/Amber
             ];
+            const colorsFlashback = [
+                { border: '#d4af37', borderInner: '#ebd58b', bg: '#1b120c', bgOpacity: 0.15 }, // Sub 1: Gold
+                { border: '#c2a649', borderInner: '#ebd58b', bg: '#18130f', bgOpacity: 0.20 }  // Sub 2: Warm gold
+            ];
+            const colorsDevice = [
+                { border: '#00f0ff', bg: '#0a1d20', bgOpacity: 0.15 }, // Sub 1: Cyan
+                { border: '#39ff14', bg: '#0a200b', bgOpacity: 0.20 }  // Sub 2: Green
+            ];
+            const colorsWhisper = [
+                { border: '#e0e0e0', bg: '#ffffff', bgOpacity: 0.12 }, // Sub 1: Soft dashed grey
+                { border: '#cccccc', bg: '#ffffff', bgOpacity: 0.12 }  // Sub 2: Soft dashed silver
+            ];
             const colorSign = colorsSignboard[i];
             const colorMusic = colorsMusic[i];
+            const colorFlashback = colorsFlashback[i];
+            const colorDevice = colorsDevice[i];
+            const colorWhisper = colorsWhisper[i];
 
             const createSvgMarkup = () => {
                 return `<svg class="ds-border-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.35)); display: block; margin: 0; padding: 0;"><path class="path-outer" fill="${colorSign.bg}" fill-opacity="${colorSign.bgOpacity}" stroke="${colorSign.border}" stroke-opacity="0.5" stroke-width="0.8" /><path class="path-middle" fill="none" stroke="${colorSign.border}" stroke-opacity="0.95" stroke-width="2.2" /><path class="path-inner" fill="none" stroke="${colorSign.border}" stroke-opacity="0.75" stroke-width="1.0" /></svg>`;
@@ -417,18 +518,58 @@ const update = () => {
                     `</g>` +
                 `</svg>`;
             };
-
+            const createFlashbackSvgMarkup = () => {
+                return `<svg class="ds-border-svg ds-flashback" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 2px 6px rgba(0,0,0,0.5)); display: block; margin: 0; padding: 0;">` +
+                    `<path class="path-outer" fill="${colorFlashback.bg}" fill-opacity="${colorFlashback.bgOpacity}" stroke="${colorFlashback.border}" stroke-opacity="0.5" stroke-width="0.8" />` +
+                    `<path class="path-middle" fill="none" stroke="${colorFlashback.border}" stroke-opacity="0.9" stroke-width="2.2" />` +
+                    `<path class="path-inner" fill="none" stroke="${colorFlashback.borderInner}" stroke-opacity="0.7" stroke-width="1.0" />` +
+                    `<rect class="fb-sprocket-l" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
+                    `<rect class="fb-sprocket-l" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
+                    `<rect class="fb-sprocket-l" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
+                    `<rect class="fb-sprocket-r" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
+                    `<rect class="fb-sprocket-r" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
+                    `<rect class="fb-sprocket-r" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
+                `</svg>`;
+            };
+ 
+            const devGlowId = `ds-device-glow-${i}-${id}`;
+            const createDeviceSvgMarkup = () => {
+                return `<svg class="ds-border-svg ds-device" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; display: block; margin: 0; padding: 0;">` +
+                    `<defs>` +
+                        `<filter id="${devGlowId}" x="-30%" y="-30%" width="160%" height="160%">` +
+                            `<feGaussianBlur stdDeviation="3.5" result="blur" />` +
+                            `<feMerge>` +
+                                `<feMergeNode in="blur" />` +
+                                `<feMergeNode in="SourceGraphic" />` +
+                            `</feMerge>` +
+                        `</filter>` +
+                    `</defs>` +
+                    `<path class="path-outer" fill="${colorDevice.bg}" fill-opacity="${colorDevice.bgOpacity}" stroke="${colorDevice.border}" stroke-opacity="0.4" stroke-width="0.8" />` +
+                    `<path class="path-middle" fill="none" stroke="${colorDevice.border}" stroke-opacity="0.9" stroke-width="2.2" filter="url(#${devGlowId})" />` +
+                    `<path class="path-inner" fill="none" stroke="${colorDevice.border}" stroke-opacity="0.6" stroke-width="1.0" stroke-dasharray="6,3" />` +
+                `</svg>`;
+            };
+ 
+            const createWhisperSvgMarkup = () => {
+                return `<svg class="ds-border-svg ds-whisper" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 1px 3px rgba(0,0,0,0.15)); display: block; margin: 0; padding: 0;">` +
+                    `<path class="path-outer" fill="${colorWhisper.bg}" fill-opacity="${colorWhisper.bgOpacity}" stroke="none" />` +
+                    `<path class="path-middle" fill="none" stroke="${colorWhisper.border}" stroke-opacity="0.8" stroke-width="1.5" stroke-dasharray="5,4" />` +
+                `</svg>`;
+            };
             let dialogueParts = [];
             if (activeSlotsDialogue[i].length > 0) {
                 dialogueParts = activeSlotsDialogue[i].map(s => {
                     if (s) {
+                        if (s.isItalic) {
+                            return `<div style="font-style: italic;">${s.text}</div>`;
+                        }
                         return `<div>${s.text}</div>`;
                     } else {
                         return `<div style="visibility: hidden;">&nbsp;</div>`;
                     }
                 });
             }
-
+  
             let specialParts = [];
             if (activeSlotsSpecial[i].length > 0) {
                 specialParts = activeSlotsSpecial[i].map(s => {
@@ -436,6 +577,15 @@ const update = () => {
                         if (s.isMusic) {
                             const musicBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 12px 36px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic;`;
                             return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special music" style="${musicBoxStyle}">${createMusicSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
+                        } else if (s.isFlashback) {
+                            const flashbackBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 20px 42px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.3 !important; font-style: italic !important;`;
+                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special ds-flashback" style="${flashbackBoxStyle}">${createFlashbackSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.3 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
+                        } else if (s.isDevice) {
+                            const deviceBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 30px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.25 !important;`;
+                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special ds-device" style="${deviceBoxStyle}">${createDeviceSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.25 !important; box-sizing: border-box !important; font-weight: bold !important;">${s.text}</span></span></div>`;
+                        } else if (s.isWhisper) {
+                            const whisperBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 14px 26px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic !important; font-size: 0.9em !important;`;
+                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special ds-whisper" style="${whisperBoxStyle}">${createWhisperSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
                         } else {
                             const specialBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 28px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important;`;
                             return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special" style="${specialBoxStyle}">${createSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
