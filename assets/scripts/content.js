@@ -15,16 +15,39 @@ function parseTime(timeStr) {
   return hrs * 3600 + mins * 60 + secs + ms / 1000;
 }
 
+function splitAssDialogue(dataStr, maxCols) {
+  const parts = [];
+  let current = "";
+  for (let i = 0; i < dataStr.length; i++) {
+    if (dataStr[i] === ',' && parts.length < maxCols - 1) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += dataStr[i];
+    }
+  }
+  parts.push(current);
+  return parts;
+}
+
 function parseLines(text, ext) {
   const lines = text.split(/\r?\n/)
   const output = []
   
   if (ext === "ass" || ext === "ssa") {
     let fmt = { start: 1, end: 2, text: 9, style: -1, name: -1 }
+    let playResX = 1920;
+    let playResY = 1080;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim()
       
-      if (line.startsWith("Format:")) {
+      if (line.startsWith("PlayResX:")) {
+        const val = parseInt(line.substring(9).trim(), 10);
+        if (!isNaN(val) && val > 0) playResX = val;
+      } else if (line.startsWith("PlayResY:")) {
+        const val = parseInt(line.substring(9).trim(), 10);
+        if (!isNaN(val) && val > 0) playResY = val;
+      } else if (line.startsWith("Format:")) {
         const cols = line.substring(7).split(",").map(c => c.trim())
         fmt.start = cols.indexOf("Start")
         fmt.end = cols.indexOf("End")
@@ -34,12 +57,12 @@ function parseLines(text, ext) {
       } 
       else if (line.startsWith("Dialogue:")) {
         const dataStr = line.substring(9).trim()
-        const parts = dataStr.split(",")
+        const parts = splitAssDialogue(dataStr, fmt.text > -1 ? fmt.text + 1 : 10)
         
         if (fmt.start > -1 && fmt.text > -1 && parts.length > fmt.text) {
           const start = parseTime(parts[fmt.start])
           const end = parseTime(parts[fmt.end])
-          const rawText = parts.slice(fmt.text).join(",")
+          const rawText = parts[fmt.text]
           
           const style = fmt.style > -1 ? parts[fmt.style] : ""
           const name = fmt.name > -1 ? parts[fmt.name] : ""
@@ -49,7 +72,8 @@ function parseLines(text, ext) {
           let inTag = false;
           let currentTag = "";
           let hasTopAlignTag = false;
-          let hasPosOrMoveTag = false;
+          let parsedPos = null;
+          let parsedAlignment = 2;
           
           for (let j = 0; j < rawText.length; j++) {
             const char = rawText[j];
@@ -66,8 +90,22 @@ function parseLines(text, ext) {
               if (/\\an[789]/.test(currentTag) || /\\a[567](?!\d)/.test(currentTag)) {
                 hasTopAlignTag = true;
               }
-              if (/\\pos|\\move/.test(currentTag)) {
-                hasPosOrMoveTag = true;
+              const anMatch = currentTag.match(/\\an([1-9])/);
+              const aMatch = currentTag.match(/\\a([1-9]|10|11)/);
+              if (anMatch) {
+                parsedAlignment = parseInt(anMatch[1], 10);
+              } else if (aMatch) {
+                const aVal = parseInt(aMatch[1], 10);
+                const aToAn = { 1: 1, 2: 2, 3: 3, 5: 7, 6: 8, 7: 9, 9: 4, 10: 5, 11: 6 };
+                if (aToAn[aVal]) parsedAlignment = aToAn[aVal];
+              }
+              const posMatch = currentTag.match(/\\pos\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)/) || currentTag.match(/\\move\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)/);
+              if (posMatch) {
+                const posX = parseFloat(posMatch[1]);
+                const posY = parseFloat(posMatch[2]);
+                if (!isNaN(posX) && !isNaN(posY)) {
+                  parsedPos = { x: posX, y: posY };
+                }
               }
             } else {
               if (inTag) {
@@ -81,6 +119,17 @@ function parseLines(text, ext) {
           }
           
           cleanText = cleanText.replace(/\\[Nn]/g, "<br>").replace(/\\h/g, " ").trim()
+          
+          let pos = null;
+          if (parsedPos) {
+            pos = {
+              x: parsedPos.x,
+              y: parsedPos.y,
+              alignment: parsedAlignment,
+              leftPercent: (parsedPos.x / playResX) * 100,
+              topPercent: (parsedPos.y / playResY) * 100
+            };
+          }
           
           const topStyleRegex = /\btop\b|ontop|on top|above|upper/i;
           const musicStyleRegex = /^(?:op|ed\d*|opening|ending|lyrics?|songs?|vocals?|theme|music|romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn|karaoke|singers?)(?:\s+alt|\s+italic)?$/i;
@@ -106,7 +155,7 @@ function parseLines(text, ext) {
           }
           
           if (cleanText) {
-            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, isTop, isSignOrTitle, isMusic, isFlashback, isDevice, isWhisper, isItalic })
+            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, pos, isTop, isSignOrTitle, isMusic, isFlashback, isDevice, isWhisper, isItalic })
           }
         }
       }
@@ -336,6 +385,21 @@ const updateSvgBorders = (parent) => {
 
 const data = { init: false, target: null, name: "none", names: [null, null], subs: [null, null] }
 const time = { current: 0, duration: 0, sync: [0, 0] }
+function getPosTransform(an) {
+  const map = {
+    1: "translate(0%, -100%)",
+    2: "translate(-50%, -100%)",
+    3: "translate(-100%, -100%)",
+    4: "translate(0%, -50%)",
+    5: "translate(-50%, -50%)",
+    6: "translate(-100%, -50%)",
+    7: "translate(0%, 0%)",
+    8: "translate(-50%, 0%)",
+    9: "translate(-100%, 0%)"
+  };
+  return map[an] || "translate(-50%, -100%)";
+}
+
 const activeSlotsDialogue = [[], []];
 const activeSlotsSpecial = [[], []];
 
@@ -354,6 +418,10 @@ const outerStyle = overlay.outer.style
 const stack = overlay.stack.element
 const stackStyle = overlay.stack.style
 
+const posContainer = document.createElement("div");
+posContainer.id = "-ext-sub-stream-overlay-pos";
+posContainer.style.cssText = "position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 2147483647;";
+
 outer.id = "-ext-sub-stream-overlay-outer"
 stack.id = "-ext-sub-stream-overlay-stack"
 
@@ -361,6 +429,7 @@ applyStyle(outer, outerStyle)
 applyStyle(stack, stackStyle)
 
 outer.appendChild(stack)
+outer.appendChild(posContainer)
 stack.appendChild(overlay.inner[1].element) 
 stack.appendChild(overlay.inner[0].element) 
 
@@ -377,97 +446,35 @@ const update = () => {
     time.current = video.currentTime
     time.duration = video.duration
     
+    let allPosMarkup = "";
     for (let i = 0; i < 2; i++) {
         if (data.subs[i]) {
             const current = time.current - time.sync[i];
             const activeLines = data.subs[i].filter(l => l.from <= current && l.to >= current);
             
-            const activeDialogue = activeLines.filter(l => !(l.isTop || l.isMusic));
-            const activeSpecial = activeLines.filter(l => (l.isTop || l.isMusic));
-            
-            // Manage dialogue slots
-            if (activeDialogue.length === 0 && activeSpecial.length === 0) {
-                activeSlotsDialogue[i] = [];
-            } else {
-                for (let s = 0; s < activeSlotsDialogue[i].length; s++) {
-                    if (activeSlotsDialogue[i][s]) {
-                        const isStillActive = activeDialogue.some(l => l.id === activeSlotsDialogue[i][s].id);
-                        if (!isStillActive) {
-                            activeSlotsDialogue[i][s] = null;
-                        }
-                    }
-                }
-
-                activeDialogue.forEach(l => {
-                    const isAssigned = activeSlotsDialogue[i].some(s => s && s.id === l.id);
-                    if (!isAssigned) {
-                        const emptyIdx = activeSlotsDialogue[i].indexOf(null);
-                        if (emptyIdx !== -1) {
-                            activeSlotsDialogue[i][emptyIdx] = l;
-                        } else {
-                            activeSlotsDialogue[i].push(l);
-                        }
-                    }
-                });
-
-                if (activeDialogue.length > 0) {
-                    while (activeSlotsDialogue[i].length > 0 && activeSlotsDialogue[i][activeSlotsDialogue[i].length - 1] === null) {
-                        activeSlotsDialogue[i].pop();
-                    }
-                }
-            }
-
-            // Manage special slots
-            if (activeSpecial.length === 0 && activeDialogue.length === 0) {
-                activeSlotsSpecial[i] = [];
-            } else {
-                for (let s = 0; s < activeSlotsSpecial[i].length; s++) {
-                    if (activeSlotsSpecial[i][s]) {
-                        const isStillActive = activeSpecial.some(l => l.id === activeSlotsSpecial[i][s].id);
-                        if (!isStillActive) {
-                            activeSlotsSpecial[i][s] = null;
-                        }
-                    }
-                }
-
-                activeSpecial.forEach(l => {
-                    const isAssigned = activeSlotsSpecial[i].some(s => s && s.id === l.id);
-                    if (!isAssigned) {
-                        const emptyIdx = activeSlotsSpecial[i].indexOf(null);
-                        if (emptyIdx !== -1) {
-                            activeSlotsSpecial[i][emptyIdx] = l;
-                        } else {
-                            activeSlotsSpecial[i].push(l);
-                        }
-                    }
-                });
-
-                if (activeSpecial.length > 0) {
-                    while (activeSlotsSpecial[i].length > 0 && activeSlotsSpecial[i][activeSlotsSpecial[i].length - 1] === null) {
-                        activeSlotsSpecial[i].pop();
-                    }
-                }
-            }
+            const activeDialogue = activeLines.filter(l => !l.pos && !(l.isTop || l.isMusic));
+            const activeSpecial = activeLines.filter(l => !l.pos && (l.isTop || l.isMusic));
+            const activePos = activeLines.filter(l => l.pos);
 
             const colorsSignboard = [
-                { border: '#423ee0', bg: '#423ee0', bgOpacity: 0.15 }, // Sub 1: Original Blue/Indigo
-                { border: '#9b8ff3', bg: '#9b8ff3', bgOpacity: 0.20 }  // Sub 2: Original Lavender/Purple
+                { border: '#423ee0', bg: '#423ee0', bgOpacity: 0.15 },
+                { border: '#9b8ff3', bg: '#9b8ff3', bgOpacity: 0.20 }
             ];
             const colorsMusic = [
-                { border: '#ff9f1c', bg: '#ff9f1c', bgOpacity: 0.04 }, // Sub 1: Warm Amber/Orange
-                { border: '#ffb703', bg: '#ffb703', bgOpacity: 0.05 }  // Sub 2: Solar Yellow/Amber
+                { border: '#ff9f1c', bg: '#ff9f1c', bgOpacity: 0.04 },
+                { border: '#ffb703', bg: '#ffb703', bgOpacity: 0.05 }
             ];
             const colorsFlashback = [
-                { border: '#d4af37', borderInner: '#ebd58b', bg: '#1b120c', bgOpacity: 0.15 }, // Sub 1: Gold
-                { border: '#c2a649', borderInner: '#ebd58b', bg: '#18130f', bgOpacity: 0.20 }  // Sub 2: Warm gold
+                { border: '#d4af37', borderInner: '#ebd58b', bg: '#1b120c', bgOpacity: 0.15 },
+                { border: '#c2a649', borderInner: '#ebd58b', bg: '#18130f', bgOpacity: 0.20 }
             ];
             const colorsDevice = [
-                { border: '#00f0ff', bg: '#0a1d20', bgOpacity: 0.15 }, // Sub 1: Cyan
-                { border: '#39ff14', bg: '#0a200b', bgOpacity: 0.20 }  // Sub 2: Green
+                { border: '#00f0ff', bg: '#0a1d20', bgOpacity: 0.15 },
+                { border: '#39ff14', bg: '#0a200b', bgOpacity: 0.20 }
             ];
             const colorsWhisper = [
-                { border: '#e0e0e0', bg: '#ffffff', bgOpacity: 0.12 }, // Sub 1: Soft dashed grey
-                { border: '#cccccc', bg: '#ffffff', bgOpacity: 0.12 }  // Sub 2: Soft dashed silver
+                { border: '#e0e0e0', bg: '#ffffff', bgOpacity: 0.12 },
+                { border: '#cccccc', bg: '#ffffff', bgOpacity: 0.12 }
             ];
             const colorSign = colorsSignboard[i];
             const colorMusic = colorsMusic[i];
@@ -553,6 +560,107 @@ const update = () => {
                     `<path class="path-middle" fill="none" stroke="${colorWhisper.border}" stroke-opacity="0.8" stroke-width="1.5" stroke-dasharray="5,4" />` +
                 `</svg>`;
             };
+
+            activePos.forEach(s => {
+                const transform = getPosTransform(s.pos.alignment);
+                const left = `${s.pos.leftPercent.toFixed(2)}%`;
+                const top = `${s.pos.topPercent.toFixed(2)}%`;
+                
+                let html = "";
+                if (s.isMusic) {
+                    const musicBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 12px 36px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic;`;
+                    html = `<span class="ds-special music" style="${musicBoxStyle}">${createMusicSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span>`;
+                } else if (s.isFlashback) {
+                    const flashbackBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 20px 42px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.3 !important; font-style: italic !important;`;
+                    html = `<span class="ds-special ds-flashback" style="${flashbackBoxStyle}">${createFlashbackSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.3 !important; box-sizing: border-box !important;">${s.text}</span></span>`;
+                } else if (s.isDevice) {
+                    const deviceBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 30px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.25 !important;`;
+                    html = `<span class="ds-special ds-device" style="${deviceBoxStyle}">${createDeviceSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.25 !important; box-sizing: border-box !important; font-weight: bold !important;">${s.text}</span></span>`;
+                } else if (s.isWhisper) {
+                    const whisperBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 14px 26px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic !important; font-size: 0.9em !important;`;
+                    html = `<span class="ds-special ds-whisper" style="${whisperBoxStyle}">${createWhisperSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span>`;
+                } else if (s.isSignOrTitle) {
+                    const specialBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 28px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important;`;
+                    html = `<span class="ds-special" style="${specialBoxStyle}">${createSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span>`;
+                } else {
+                    if (s.isItalic) {
+                        html = `<div style="font-style: italic;">${s.text}</div>`;
+                    } else {
+                        html = `<div>${s.text}</div>`;
+                    }
+                }
+
+                const innStyle = overlay.inner[i].style;
+                const fontSz = innStyle.fontSize ? (typeof innStyle.fontSize === 'number' ? `${innStyle.fontSize}px` : innStyle.fontSize) : '40px';
+                const posWrapperStyle = `position: absolute; left: ${left}; top: ${top}; transform: ${transform}; pointer-events: none; text-align: center; white-space: nowrap; font-size: ${fontSz}; color: ${innStyle.color || '#ffffff'}; font-weight: ${innStyle.fontWeight || 'normal'}; text-shadow: ${innStyle.textShadow || '0px 0px 10px #000'}; font-family: ${innStyle.fontFamily || 'sans-serif'};`;
+                allPosMarkup += `<div style="${posWrapperStyle}">${html}</div>`;
+            });
+            
+            // Manage dialogue slots
+            if (activeDialogue.length === 0 && activeSpecial.length === 0) {
+                activeSlotsDialogue[i] = [];
+            } else {
+                for (let s = 0; s < activeSlotsDialogue[i].length; s++) {
+                    if (activeSlotsDialogue[i][s]) {
+                        const isStillActive = activeDialogue.some(l => l.id === activeSlotsDialogue[i][s].id);
+                        if (!isStillActive) {
+                            activeSlotsDialogue[i][s] = null;
+                        }
+                    }
+                }
+
+                activeDialogue.forEach(l => {
+                    const isAssigned = activeSlotsDialogue[i].some(s => s && s.id === l.id);
+                    if (!isAssigned) {
+                        const emptyIdx = activeSlotsDialogue[i].indexOf(null);
+                        if (emptyIdx !== -1) {
+                            activeSlotsDialogue[i][emptyIdx] = l;
+                        } else {
+                            activeSlotsDialogue[i].push(l);
+                        }
+                    }
+                });
+
+                if (activeDialogue.length > 0) {
+                    while (activeSlotsDialogue[i].length > 0 && activeSlotsDialogue[i][activeSlotsDialogue[i].length - 1] === null) {
+                        activeSlotsDialogue[i].pop();
+                    }
+                }
+            }
+
+            // Manage special slots
+            if (activeSpecial.length === 0 && activeDialogue.length === 0) {
+                activeSlotsSpecial[i] = [];
+            } else {
+                for (let s = 0; s < activeSlotsSpecial[i].length; s++) {
+                    if (activeSlotsSpecial[i][s]) {
+                        const isStillActive = activeSpecial.some(l => l.id === activeSlotsSpecial[i][s].id);
+                        if (!isStillActive) {
+                            activeSlotsSpecial[i][s] = null;
+                        }
+                    }
+                }
+
+                activeSpecial.forEach(l => {
+                    const isAssigned = activeSlotsSpecial[i].some(s => s && s.id === l.id);
+                    if (!isAssigned) {
+                        const emptyIdx = activeSlotsSpecial[i].indexOf(null);
+                        if (emptyIdx !== -1) {
+                            activeSlotsSpecial[i][emptyIdx] = l;
+                        } else {
+                            activeSlotsSpecial[i].push(l);
+                        }
+                    }
+                });
+
+                if (activeSpecial.length > 0) {
+                    while (activeSlotsSpecial[i].length > 0 && activeSlotsSpecial[i][activeSlotsSpecial[i].length - 1] === null) {
+                        activeSlotsSpecial[i].pop();
+                    }
+                }
+            }
+
+
             let dialogueParts = [];
             if (activeSlotsDialogue[i].length > 0) {
                 dialogueParts = activeSlotsDialogue[i].map(s => {
@@ -620,6 +728,11 @@ const update = () => {
             activeSlotsDialogue[i] = [];
             activeSlotsSpecial[i] = [];
         }
+    }
+
+    if (posContainer.innerHTML !== allPosMarkup) {
+        posContainer.innerHTML = allPosMarkup;
+        updateSvgBorders(posContainer);
     }
 
     const rect = video.getBoundingClientRect()
@@ -752,6 +865,7 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
       inn.element.style.display = "none";
       inn.element.innerHTML = "";
     });
+    posContainer.innerHTML = "";
     data.name = "none"
     data.names = [null, null]
     data.subs = [null, null]
