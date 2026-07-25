@@ -82,6 +82,7 @@ function parseLines(text, ext) {
           
           cleanText = cleanText.replace(/\\[Nn]/g, "<br>").replace(/\\h/g, " ").trim()
           
+          const topStyleRegex = /\btop\b|ontop|on top|above|upper/i;
           const musicStyleRegex = /^(?:op|ed\d*|opening|ending|lyrics?|songs?|vocals?|theme|music|romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn|karaoke|singers?)(?:\s+alt|\s+italic)?$/i;
           const musicKeywordRegex = /(?:^|[^a-zA-Z])(?:op|ed\d*|opening|ending|lyrics|song|vocal|theme)(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:op|ed)\d*(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:op|ed)\d*(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:$|[^a-zA-Z])|lyrics|karaoke|singer/i;
           const flashbackStyleRegex = /flashback|fb/i;
@@ -94,22 +95,18 @@ function parseLines(text, ext) {
           const isDevice = deviceStyleRegex.test(style) || deviceStyleRegex.test(name);
           const isWhisper = whisperStyleRegex.test(style) || whisperStyleRegex.test(name);
           const isItalic = thoughtStyleRegex.test(style) || thoughtStyleRegex.test(name);
+          const isTopStyle = topStyleRegex.test(style) || topStyleRegex.test(name);
           
           const isMusic = /[\u2669-\u266F]/.test(cleanText) || cleanText.includes("♪") || cleanText.includes("♫") || musicStyleRegex.test(style) || musicKeywordRegex.test(style) || musicStyleRegex.test(name) || musicKeywordRegex.test(name);
-          const isSignOrTitle = signStyleRegex.test(style) || signStyleRegex.test(name) || hasPosOrMoveTag;
-          
-          const isDialogueStyle = /^(?:default|dialogue|main|subs|spoken|vocal)?$/i.test(style.trim());
-          const isDialogueActor = name.trim() === "" || /^(?:speaker|character|voice|narrator)/i.test(name.trim());
+          const isSignOrTitle = signStyleRegex.test(style) || signStyleRegex.test(name);
           
           let isTop = false;
-          if (isSignOrTitle || isFlashback || isDevice || isWhisper) {
-            isTop = true;
-          } else if (hasTopAlignTag && !(isDialogueStyle && isDialogueActor)) {
+          if (isSignOrTitle || isFlashback || isDevice || isWhisper || isTopStyle || hasTopAlignTag) {
             isTop = true;
           }
           
           if (cleanText) {
-            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, isTop, isMusic, isFlashback, isDevice, isWhisper, isItalic })
+            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, isTop, isSignOrTitle, isMusic, isFlashback, isDevice, isWhisper, isItalic })
           }
         }
       }
@@ -586,9 +583,14 @@ const update = () => {
                         } else if (s.isWhisper) {
                             const whisperBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 14px 26px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic !important; font-size: 0.9em !important;`;
                             return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special ds-whisper" style="${whisperBoxStyle}">${createWhisperSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
-                        } else {
+                        } else if (s.isSignOrTitle) {
                             const specialBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 28px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important;`;
                             return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special" style="${specialBoxStyle}">${createSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
+                        } else {
+                            if (s.isItalic) {
+                                return `<div style="font-style: italic;">${s.text}</div>`;
+                            }
+                            return `<div>${s.text}</div>`;
                         }
                     } else {
                         return `<div style="visibility: hidden;">&nbsp;</div>`;
