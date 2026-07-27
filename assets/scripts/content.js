@@ -343,132 +343,40 @@ function parseLines(text, ext) {
             };
           }
           
-          const topStyleRegex = /\btop\b|ontop|on top|above|upper/i;
-          const musicStyleRegex = /^(?:op|ed\d*|opening|ending|lyrics?|songs?|vocals?|theme|music|romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn|karaoke|singers?)(?:\s+alt|\s+italic)?$/i;
-          const musicKeywordRegex = /(?:^|[^a-zA-Z])(?:op|ed\d*|opening|ending|lyrics|song|vocal|theme)(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:op|ed)\d*(?:$|[^a-zA-Z])|(?:^|[^a-zA-Z])(?:op|ed)\d*(?:romaji|kanji|trans(?:lation)?|eng(?:lish)?|viet(?:namese)?|vn)(?:$|[^a-zA-Z])|lyrics|karaoke|singer/i;
-          const flashbackStyleRegex = /flashback|fb/i;
-          const deviceStyleRegex = /phone|radio|tv|speaker|device|transmitter|comm|intercom|megaphone|robot/i;
-          const whisperStyleRegex = /whisper|low|murmur|quiet/i;
-          const signStyleRegex = /sign|location|title|credit|flash|staff|note|label|caption|screen|text|card|insert/i;
-          const thoughtStyleRegex = /italic|thoughts?|internal|monologue|offscreen|os\b|behind|voiceover|vo\b/i;
-
-          const isFlashback = flashbackStyleRegex.test(style) || flashbackStyleRegex.test(name);
-          const isDevice = deviceStyleRegex.test(style) || deviceStyleRegex.test(name);
-          const isWhisper = whisperStyleRegex.test(style) || whisperStyleRegex.test(name);
-          const isItalic = thoughtStyleRegex.test(style) || thoughtStyleRegex.test(name);
-          const isTopStyle = topStyleRegex.test(style) || topStyleRegex.test(name);
-          
-          const isMusic = /[\u2669-\u266F]/.test(plainText) || plainText.includes("♪") || plainText.includes("♫") || musicStyleRegex.test(style) || musicKeywordRegex.test(style) || musicStyleRegex.test(name) || musicKeywordRegex.test(name);
-          const isSignOrTitle = signStyleRegex.test(style) || signStyleRegex.test(name);
-          
-          let isTop = false;
-          if (isSignOrTitle || isFlashback || isDevice || isWhisper || isTopStyle || hasTopAlignTag) {
-            isTop = true;
-          }
-          
           if (plainText) {
-            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, pos, isTop, isSignOrTitle, isMusic, isFlashback, isDevice, isWhisper, isItalic })
+            output.push({ id: `${start}-${end}-${output.length}`, from: start, to: end, text: cleanText, pos })
           }
         }
       }
     }
   } else {
-    let current = { from: 0, to: 0, text: "", isTop: false, isMusic: false }
+    let current = { from: 0, to: 0, text: "" }
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i].trim()
       if (line === "WEBVTT" || line.startsWith("NOTE") || line.startsWith("STYLE") || line.startsWith("REGION")) continue;
       
       if (/^\d+$/.test(line) && !line.includes("-->")) {
-        current = { from: 0, to: 0, text: "", isTop: false, isMusic: false }
+        current = { from: 0, to: 0, text: "" }
       } else if (line.includes("-->")) {
         const parts = line.split("-->")
         const start = parts[0].trim().split(" ")[0]
-        const endPart = parts[1].trim()
-        const end = endPart.split(" ")[0]
+        const end = parts[1].trim().split(" ")[0]
         current.from = parseTime(start)
         current.to = parseTime(end)
-        
-        if (/line:(?:[0-5]|(?:[1-2]?\d|30)%)/.test(endPart)) {
-          // Keep normal dialogue styling (no signboard border)
-        }
-        const yCoordMatch = endPart.match(/Y1:\s*(\d+)/i)
-        if (yCoordMatch && parseInt(yCoordMatch[1]) < 200) {
-          // Keep normal dialogue styling (no signboard border)
-        }
       } else if (line) {
         if (/{\\an[789]/.test(line) || /{\\a[567](?!\d)/.test(line)) {
           line = line.replace(/{\\an[789]}/g, "").replace(/{\\a[567]}/g, "")
         }
         current.text = (current.text ? current.text + "<br>" : "") + line
       } else if (current.text) {
-        let isFlashback = false;
-        let isDevice = false;
-        let isWhisper = false;
-        let isItalic = false;
-        let cleanText = current.text;
-        
-        if (/^\s*<i>?\s*[\[\(\{](?:flashback|fb)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
-          cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:flashback|fb)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
-          isFlashback = true;
-        }
-        if (/^\s*<i>?\s*[\[\(\{](?:phone|radio|tv|device|comm)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
-          cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:phone|radio|tv|device|comm)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
-          isDevice = true;
-        }
-        if (/^\s*<i>?\s*[\[\(\{](?:whisper|low|murmur|quiet)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
-          cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:whisper|low|murmur|quiet)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
-          isWhisper = true;
-        }
-        if (/^\s*<i>?\s*[\[\(\{](?:italic|thought|monologue|offscreen|os|vo)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
-          cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:italic|thought|monologue|offscreen|os|vo)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
-          isItalic = true;
-        }
-        
-        current.text = cleanText.trim();
-        current.isMusic = /[\u2669-\u266F]/.test(current.text) || current.text.includes("♪") || current.text.includes("♫");
-        current.isFlashback = isFlashback;
-        current.isDevice = isDevice;
-        current.isWhisper = isWhisper;
-        current.isItalic = isItalic || (current.text.startsWith("<i>") && current.text.endsWith("</i>"));
-        current.isTop = current.isTop || isFlashback || isDevice || isWhisper;
-        
+        current.text = current.text.trim();
         current.id = `${current.from}-${current.to}-${output.length}`;
         output.push(current)
-        current = { from: 0, to: 0, text: "", isTop: false, isMusic: false }
+        current = { from: 0, to: 0, text: "" }
       }
     }
     if (current.text) {
-      let isFlashback = false;
-      let isDevice = false;
-      let isWhisper = false;
-      let isItalic = false;
-      let cleanText = current.text;
-      
-      if (/^\s*<i>?\s*[\[\(\{](?:flashback|fb)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
-        cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:flashback|fb)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
-        isFlashback = true;
-      }
-      if (/^\s*<i>?\s*[\[\(\{](?:phone|radio|tv|device|comm)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
-        cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:phone|radio|tv|device|comm)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
-        isDevice = true;
-      }
-      if (/^\s*<i>?\s*[\[\(\{](?:whisper|low|murmur|quiet)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
-        cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:whisper|low|murmur|quiet)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
-        isWhisper = true;
-      }
-      if (/^\s*<i>?\s*[\[\(\{](?:italic|thought|monologue|offscreen|os|vo)[\]\)\}]\s*<\/i>?/i.test(cleanText)) {
-        cleanText = cleanText.replace(/^\s*(<i>?\s*)[\[\(\{](?:italic|thought|monologue|offscreen|os|vo)[\]\)\}](\s*<\/i>?\s*)/i, "$1$2");
-        isItalic = true;
-      }
-      
-      current.text = cleanText.trim();
-      current.isMusic = /[\u2669-\u266F]/.test(current.text) || current.text.includes("♪") || current.text.includes("♫");
-      current.isFlashback = isFlashback;
-      current.isDevice = isDevice;
-      current.isWhisper = isWhisper;
-      current.isItalic = isItalic || (current.text.startsWith("<i>") && current.text.endsWith("</i>"));
-      current.isTop = current.isTop || isFlashback || isDevice || isWhisper;
-      
+      current.text = current.text.trim();
       current.id = `${current.from}-${current.to}-${output.length}`;
       output.push(current)
     }
@@ -507,93 +415,7 @@ const applyStyle = (element, current, history = null) => {
   }
 }
 
-const hexToRgba = (hex, opacity) => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-};
 
-const updateSvgBorders = (parent) => {
-  const svgs = parent.querySelectorAll('.ds-border-svg');
-  for (let j = 0; j < svgs.length; j++) {
-    const svg = svgs[j];
-    const container = svg.parentElement;
-    if (!container) continue;
-    const w = container.offsetWidth;
-    const h = container.offsetHeight;
-    if (w === 0 || h === 0) continue;
-    
-    const currentW = svg.getAttribute('width');
-    const currentH = svg.getAttribute('height');
-    if (currentW === `${w}` && currentH === `${h}`) continue;
-    
-    svg.setAttribute('width', w);
-    svg.setAttribute('height', h);
-    
-    const pathOuter = svg.querySelector('.path-outer');
-    const pathMiddle = svg.querySelector('.path-middle');
-    const pathInner = svg.querySelector('.path-inner');
-    
-    const pathMusicBg = svg.querySelector('.path-music-bg');
-    const pathMusicTopOuter = svg.querySelector('.path-music-top-outer');
-    const pathMusicTopInner = svg.querySelector('.path-music-top-inner');
-    const pathMusicBottomOuter = svg.querySelector('.path-music-bottom-outer');
-    const pathMusicBottomInner = svg.querySelector('.path-music-bottom-inner');
-    const noteLeft = svg.querySelector('.note-group-left');
-    const noteRight = svg.querySelector('.note-group-right');
-
-    const sprocketsL = svg.querySelectorAll('.fb-sprocket-l');
-    const sprocketsR = svg.querySelectorAll('.fb-sprocket-r');
-    
-    if (pathOuter) {
-      pathOuter.setAttribute('d', `M 14,2 L ${w - 14},2 L ${w - 14},6 A 8,8 0 0,0 ${w - 6},14 L ${w - 2},14 L ${w - 2},${h - 14} L ${w - 6},${h - 14} A 8,8 0 0,0 ${w - 14},${h - 6} L ${w - 14},${h - 2} L 14,${h - 2} L 14,${h - 6} A 8,8 0 0,0 6,${h - 14} L 2,${h - 14} L 2,14 L 6,14 A 8,8 0 0,0 14,6 L 14,2 Z`);
-    }
-    if (pathMiddle) {
-      pathMiddle.setAttribute('d', `M 16,4 L ${w - 16},4 L ${w - 16},8 A 8,8 0 0,0 ${w - 8},16 L ${w - 4},16 L ${w - 4},${h - 16} L ${w - 8},${h - 16} A 8,8 0 0,0 ${w - 16},${h - 8} L ${w - 16},${h - 4} L 16,${h - 4} L 16,${h - 8} A 8,8 0 0,0 8,${h - 16} L 4,${h - 16} L 4,16 L 8,16 A 8,8 0 0,0 16,8 L 16,4 Z`);
-    }
-    if (pathInner) {
-      pathInner.setAttribute('d', `M 22,10 L ${w - 22},10 L ${w - 22},14 A 8,8 0 0,0 ${w - 14},22 L ${w - 10},22 L ${w - 10},${h - 22} L ${w - 14},${h - 22} A 8,8 0 0,0 ${w - 22},${h - 14} L ${w - 22},${h - 10} L 22,${h - 10} L 22,${h - 14} A 8,8 0 0,0 14,${h - 22} L 10,${h - 22} L 10,22 L 14,22 A 8,8 0 0,0 22,14 L 22,10 Z`);
-    }
-    
-    if (pathMusicBg) {
-      pathMusicBg.setAttribute('d', `M 12,2 L ${w - 12},2 A 10,10 0 0,1 ${w - 2},12 L ${w - 2},${h - 12} A 10,10 0 0,1 ${w - 12},${h - 2} L 12,${h - 2} A 10,10 0 0,1 2,${h - 12} L 2,12 A 10,10 0 0,1 12,2 Z`);
-      if (pathMusicTopOuter) {
-        pathMusicTopOuter.setAttribute('d', `M 12,2 L ${w - 12},2`);
-      }
-      if (pathMusicTopInner) {
-        pathMusicTopInner.setAttribute('d', `M 14,6 L ${w - 14},6`);
-      }
-      if (pathMusicBottomOuter) {
-        pathMusicBottomOuter.setAttribute('d', `M 12,${h - 2} L ${w - 12},${h - 2}`);
-      }
-      if (pathMusicBottomInner) {
-        pathMusicBottomInner.setAttribute('d', `M 14,${h - 6} L ${w - 14},${h - 6}`);
-      }
-    }
-    if (noteLeft) {
-      noteLeft.setAttribute('transform', `translate(18, ${h / 2})`);
-    }
-    if (noteRight) {
-      noteRight.setAttribute('transform', `translate(${w - 18}, ${h / 2})`);
-    }
-
-    if (sprocketsL.length > 0) {
-      for (let k = 0; k < sprocketsL.length; k++) {
-        const yVal = h / 2 - 17 + k * 13;
-        sprocketsL[k].setAttribute('y', yVal);
-        sprocketsL[k].setAttribute('x', 14);
-      }
-    }
-    if (sprocketsR.length > 0) {
-      for (let k = 0; k < sprocketsR.length; k++) {
-        const yVal = h / 2 - 17 + k * 13;
-        sprocketsR[k].setAttribute('y', yVal);
-        sprocketsR[k].setAttribute('x', w - 20);
-      }
-    }
-  }
-};
 
 const data = { init: false, target: null, name: "none", names: [null, null], subs: [null, null] }
 const time = { current: 0, duration: 0, sync: [0, 0] }
@@ -613,7 +435,6 @@ function getPosTransform(an) {
 }
 
 const activeSlotsDialogue = [[], []];
-const activeSlotsSpecial = [[], []];
 
 const overlay = {
   version: "2.6", 
@@ -664,114 +485,8 @@ const update = () => {
             const current = time.current - time.sync[i];
             const activeLines = data.subs[i].filter(l => l.from <= current && l.to >= current);
             
-            const activeDialogue = activeLines.filter(l => !l.pos && !(l.isTop || l.isMusic));
-            const activeSpecial = activeLines.filter(l => !l.pos && (l.isTop || l.isMusic));
+            const activeDialogue = activeLines.filter(l => !l.pos);
             const activePos = activeLines.filter(l => l.pos);
-
-            const colorsSignboard = [
-                { border: '#423ee0', bg: '#423ee0', bgOpacity: 0.15 },
-                { border: '#9b8ff3', bg: '#9b8ff3', bgOpacity: 0.20 }
-            ];
-            const colorsMusic = [
-                { border: '#ff9f1c', bg: '#ff9f1c', bgOpacity: 0.04 },
-                { border: '#ffb703', bg: '#ffb703', bgOpacity: 0.05 }
-            ];
-            const colorsFlashback = [
-                { border: '#d4af37', borderInner: '#ebd58b', bg: '#1b120c', bgOpacity: 0.15 },
-                { border: '#c2a649', borderInner: '#ebd58b', bg: '#18130f', bgOpacity: 0.20 }
-            ];
-            const colorsDevice = [
-                { border: '#00f0ff', bg: '#0a1d20', bgOpacity: 0.15 },
-                { border: '#39ff14', bg: '#0a200b', bgOpacity: 0.20 }
-            ];
-            const colorsWhisper = [
-                { border: '#e0e0e0', bg: '#ffffff', bgOpacity: 0.12 },
-                { border: '#cccccc', bg: '#ffffff', bgOpacity: 0.12 }
-            ];
-            const colorSign = colorsSignboard[i];
-            const colorMusic = colorsMusic[i];
-            const colorFlashback = colorsFlashback[i];
-            const colorDevice = colorsDevice[i];
-            const colorWhisper = colorsWhisper[i];
-
-            const createSvgMarkup = () => {
-                return `<svg class="ds-border-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.35)); display: block; margin: 0; padding: 0;"><path class="path-outer" fill="${colorSign.bg}" fill-opacity="${colorSign.bgOpacity}" stroke="${colorSign.border}" stroke-opacity="0.5" stroke-width="0.8" /><path class="path-middle" fill="none" stroke="${colorSign.border}" stroke-opacity="0.95" stroke-width="2.2" /><path class="path-inner" fill="none" stroke="${colorSign.border}" stroke-opacity="0.75" stroke-width="1.0" /></svg>`;
-            };
-
-            const gradId = `ds-music-grad-${i}-${id}`;
-            const glowId = `ds-music-glow-${i}-${id}`;
-            const createMusicSvgMarkup = () => {
-                return `<svg class="ds-border-svg music" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 2px 5px rgba(0,0,0,0.65)); display: block; margin: 0; padding: 0;">` +
-                    `<defs>` +
-                        `<linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">` +
-                            `<stop offset="0%" stop-color="${colorMusic.bg}" stop-opacity="0.00" />` +
-                            `<stop offset="15%" stop-color="${colorMusic.bg}" stop-opacity="0.05" />` +
-                            `<stop offset="50%" stop-color="${colorMusic.bg}" stop-opacity="0.10" />` +
-                            `<stop offset="85%" stop-color="${colorMusic.bg}" stop-opacity="0.05" />` +
-                            `<stop offset="100%" stop-color="${colorMusic.bg}" stop-opacity="0.00" />` +
-                        `</linearGradient>` +
-                        `<filter id="${glowId}" x="-50%" y="-50%" width="200%" height="200%">` +
-                            `<feGaussianBlur stdDeviation="3.0" result="coloredBlur"/>` +
-                            `<feMerge>` +
-                                `<feMergeNode in="coloredBlur"/>` +
-                                `<feMergeNode in="coloredBlur"/>` +
-                                `<feMergeNode in="SourceGraphic"/>` +
-                            `</feMerge>` +
-                        `</filter>` +
-                    `</defs>` +
-                    `<path class="path-music-bg" fill="url(#${gradId})" stroke="none" />` +
-                    `<path class="path-music-top-outer" fill="none" stroke="${colorMusic.border}" stroke-opacity="0.90" stroke-width="3.2" filter="url(#${glowId})" />` +
-                    `<path class="path-music-top-inner" fill="none" stroke="${colorMusic.border}" stroke-opacity="0.60" stroke-width="1.6" />` +
-                    `<path class="path-music-bottom-outer" fill="none" stroke="${colorMusic.border}" stroke-opacity="0.90" stroke-width="3.2" filter="url(#${glowId})" />` +
-                    `<path class="path-music-bottom-inner" fill="none" stroke="${colorMusic.border}" stroke-opacity="0.60" stroke-width="1.6" />` +
-                    `<g class="note-group-left">` +
-                        `<circle class="note-glow-left" r="13" fill="${colorMusic.border}" fill-opacity="0.15" filter="url(#${glowId})" />` +
-                        `<text font-size="22" font-family="system-ui, sans-serif" font-weight="bold" dominant-baseline="central" text-anchor="middle" fill="#ffffff" style="text-shadow: 0 0 4px ${colorMusic.border};">♪</text>` +
-                    `</g>` +
-                    `<g class="note-group-right">` +
-                        `<circle class="note-glow-right" r="13" fill="${colorMusic.border}" fill-opacity="0.15" filter="url(#${glowId})" />` +
-                        `<text font-size="22" font-family="system-ui, sans-serif" font-weight="bold" dominant-baseline="central" text-anchor="middle" fill="#ffffff" style="text-shadow: 0 0 4px ${colorMusic.border};">♫</text>` +
-                    `</g>` +
-                `</svg>`;
-            };
-            const createFlashbackSvgMarkup = () => {
-                return `<svg class="ds-border-svg ds-flashback" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 2px 6px rgba(0,0,0,0.5)); display: block; margin: 0; padding: 0;">` +
-                    `<path class="path-outer" fill="${colorFlashback.bg}" fill-opacity="${colorFlashback.bgOpacity}" stroke="${colorFlashback.border}" stroke-opacity="0.5" stroke-width="0.8" />` +
-                    `<path class="path-middle" fill="none" stroke="${colorFlashback.border}" stroke-opacity="0.9" stroke-width="2.2" />` +
-                    `<path class="path-inner" fill="none" stroke="${colorFlashback.borderInner}" stroke-opacity="0.7" stroke-width="1.0" />` +
-                    `<rect class="fb-sprocket-l" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
-                    `<rect class="fb-sprocket-l" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
-                    `<rect class="fb-sprocket-l" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
-                    `<rect class="fb-sprocket-r" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
-                    `<rect class="fb-sprocket-r" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
-                    `<rect class="fb-sprocket-r" width="6" height="10" rx="1.5" fill="#0b0805" stroke="${colorFlashback.border}" stroke-width="0.6" stroke-opacity="0.8" />` +
-                `</svg>`;
-            };
- 
-            const devGlowId = `ds-device-glow-${i}-${id}`;
-            const createDeviceSvgMarkup = () => {
-                return `<svg class="ds-border-svg ds-device" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; display: block; margin: 0; padding: 0;">` +
-                    `<defs>` +
-                        `<filter id="${devGlowId}" x="-30%" y="-30%" width="160%" height="160%">` +
-                            `<feGaussianBlur stdDeviation="3.5" result="blur" />` +
-                            `<feMerge>` +
-                                `<feMergeNode in="blur" />` +
-                                `<feMergeNode in="SourceGraphic" />` +
-                            `</feMerge>` +
-                        `</filter>` +
-                    `</defs>` +
-                    `<path class="path-outer" fill="${colorDevice.bg}" fill-opacity="${colorDevice.bgOpacity}" stroke="${colorDevice.border}" stroke-opacity="0.4" stroke-width="0.8" />` +
-                    `<path class="path-middle" fill="none" stroke="${colorDevice.border}" stroke-opacity="0.9" stroke-width="2.2" filter="url(#${devGlowId})" />` +
-                    `<path class="path-inner" fill="none" stroke="${colorDevice.border}" stroke-opacity="0.6" stroke-width="1.0" stroke-dasharray="6,3" />` +
-                `</svg>`;
-            };
- 
-            const createWhisperSvgMarkup = () => {
-                return `<svg class="ds-border-svg ds-whisper" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; overflow: visible; filter: drop-shadow(0px 1px 3px rgba(0,0,0,0.15)); display: block; margin: 0; padding: 0;">` +
-                    `<path class="path-outer" fill="${colorWhisper.bg}" fill-opacity="${colorWhisper.bgOpacity}" stroke="none" />` +
-                    `<path class="path-middle" fill="none" stroke="${colorWhisper.border}" stroke-opacity="0.8" stroke-width="1.5" stroke-dasharray="5,4" />` +
-                `</svg>`;
-            };
 
             activePos.forEach(s => {
                 const transform = getPosTransform(s.pos.alignment);
@@ -807,30 +522,7 @@ const update = () => {
 
                 const left = `${leftPercent.toFixed(2)}%`;
                 const top = `${topPercent.toFixed(2)}%`;
-                
-                let html = "";
-                if (s.isMusic) {
-                    const musicBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 12px 36px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic;`;
-                    html = `<span class="ds-special music" style="${musicBoxStyle}">${createMusicSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span>`;
-                } else if (s.isFlashback) {
-                    const flashbackBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 20px 42px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.3 !important; font-style: italic !important;`;
-                    html = `<span class="ds-special ds-flashback" style="${flashbackBoxStyle}">${createFlashbackSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.3 !important; box-sizing: border-box !important;">${s.text}</span></span>`;
-                } else if (s.isDevice) {
-                    const deviceBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 30px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.25 !important;`;
-                    html = `<span class="ds-special ds-device" style="${deviceBoxStyle}">${createDeviceSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.25 !important; box-sizing: border-box !important; font-weight: bold !important;">${s.text}</span></span>`;
-                } else if (s.isWhisper) {
-                    const whisperBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 14px 26px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic !important; font-size: 0.9em !important;`;
-                    html = `<span class="ds-special ds-whisper" style="${whisperBoxStyle}">${createWhisperSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span>`;
-                } else if (s.isSignOrTitle) {
-                    const specialBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 28px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important;`;
-                    html = `<span class="ds-special" style="${specialBoxStyle}">${createSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span>`;
-                } else {
-                    if (s.isItalic) {
-                        html = `<div style="font-style: italic;">${s.text}</div>`;
-                    } else {
-                        html = `<div>${s.text}</div>`;
-                    }
-                }
+                const html = `<div>${s.text}</div>`;
 
                 const innStyle = overlay.inner[i].style;
                 const fontSz = innStyle.fontSize ? (typeof innStyle.fontSize === 'number' ? `${innStyle.fontSize}px` : innStyle.fontSize) : '40px';
@@ -839,7 +531,7 @@ const update = () => {
             });
             
             // Manage dialogue slots
-            if (activeDialogue.length === 0 && activeSpecial.length === 0) {
+            if (activeDialogue.length === 0) {
                 activeSlotsDialogue[i] = [];
             } else {
                 for (let s = 0; s < activeSlotsDialogue[i].length; s++) {
@@ -870,93 +562,24 @@ const update = () => {
                 }
             }
 
-            // Manage special slots
-            if (activeSpecial.length === 0 && activeDialogue.length === 0) {
-                activeSlotsSpecial[i] = [];
-            } else {
-                for (let s = 0; s < activeSlotsSpecial[i].length; s++) {
-                    if (activeSlotsSpecial[i][s]) {
-                        const isStillActive = activeSpecial.some(l => l.id === activeSlotsSpecial[i][s].id);
-                        if (!isStillActive) {
-                            activeSlotsSpecial[i][s] = null;
-                        }
-                    }
-                }
-
-                activeSpecial.forEach(l => {
-                    const isAssigned = activeSlotsSpecial[i].some(s => s && s.id === l.id);
-                    if (!isAssigned) {
-                        const emptyIdx = activeSlotsSpecial[i].indexOf(null);
-                        if (emptyIdx !== -1) {
-                            activeSlotsSpecial[i][emptyIdx] = l;
-                        } else {
-                            activeSlotsSpecial[i].push(l);
-                        }
-                    }
-                });
-
-                if (activeSpecial.length > 0) {
-                    while (activeSlotsSpecial[i].length > 0 && activeSlotsSpecial[i][activeSlotsSpecial[i].length - 1] === null) {
-                        activeSlotsSpecial[i].pop();
-                    }
-                }
-            }
-
-
             let dialogueParts = [];
             if (activeSlotsDialogue[i].length > 0) {
                 dialogueParts = activeSlotsDialogue[i].map(s => {
                     if (s) {
-                        if (s.isItalic) {
-                            return `<div style="font-style: italic;">${s.text}</div>`;
-                        }
                         return `<div>${s.text}</div>`;
                     } else {
                         return `<div style="visibility: hidden;">&nbsp;</div>`;
                     }
                 });
             }
-  
-            let specialParts = [];
-            if (activeSlotsSpecial[i].length > 0) {
-                specialParts = activeSlotsSpecial[i].map(s => {
-                    if (s) {
-                        if (s.isMusic) {
-                            const musicBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 12px 36px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic;`;
-                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special music" style="${musicBoxStyle}">${createMusicSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
-                        } else if (s.isFlashback) {
-                            const flashbackBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 20px 42px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.3 !important; font-style: italic !important;`;
-                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special ds-flashback" style="${flashbackBoxStyle}">${createFlashbackSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.3 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
-                        } else if (s.isDevice) {
-                            const deviceBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 30px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.25 !important;`;
-                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special ds-device" style="${deviceBoxStyle}">${createDeviceSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.25 !important; box-sizing: border-box !important; font-weight: bold !important;">${s.text}</span></span></div>`;
-                        } else if (s.isWhisper) {
-                            const whisperBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 14px 26px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important; font-style: italic !important; font-size: 0.9em !important;`;
-                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special ds-whisper" style="${whisperBoxStyle}">${createWhisperSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
-                        } else if (s.isSignOrTitle) {
-                            const specialBoxStyle = `position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 18px 28px; z-index: 0; vertical-align: middle; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; text-align: center; box-sizing: border-box; line-height: 1.2 !important;`;
-                            return `<div style="display: flex; justify-content: center; margin: 6px 0;"><span class="ds-special" style="${specialBoxStyle}">${createSvgMarkup()}<span style="display: block !important; text-align: center !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; line-height: 1.2 !important; box-sizing: border-box !important;">${s.text}</span></span></div>`;
-                        } else {
-                            if (s.isItalic) {
-                                return `<div style="font-style: italic;">${s.text}</div>`;
-                            }
-                            return `<div>${s.text}</div>`;
-                        }
-                    } else {
-                        return `<div style="visibility: hidden;">&nbsp;</div>`;
-                    }
-                });
-            }
 
-            const combinedParts = [...dialogueParts, ...specialParts];
-            const text = [...combinedParts].reverse().join("");
+            const text = [...dialogueParts].reverse().join("");
             
             if (text !== "") {
                 if (overlay.inner[i].element.innerHTML !== text) {
                     overlay.inner[i].element.innerHTML = text;
                 }
                 overlay.inner[i].element.style.visibility = "visible";
-                updateSvgBorders(overlay.inner[i].element);
             } else {
                 if (overlay.inner[i].element.innerHTML !== "&nbsp;") {
                     overlay.inner[i].element.innerHTML = "&nbsp;";
@@ -968,13 +591,11 @@ const update = () => {
         } else {
             overlay.inner[i].element.style.display = "none";
             activeSlotsDialogue[i] = [];
-            activeSlotsSpecial[i] = [];
         }
     }
 
     if (posContainer.innerHTML !== allPosMarkup) {
         posContainer.innerHTML = allPosMarkup;
-        updateSvgBorders(posContainer);
     }
 
     const rect = video.getBoundingClientRect()
@@ -1093,7 +714,6 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     overlay.inner[idx].element.style.display = "none";
     overlay.inner[idx].element.innerHTML = "";
     activeSlotsDialogue[idx] = [];
-    activeSlotsSpecial[idx] = [];
     
     data.name = data.names.filter(Boolean).join(" & ") || "none"
     if (data.names.filter(Boolean).length === 0) {
@@ -1114,7 +734,6 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     time.sync = [0, 0]
     for (let i = 0; i < 2; i++) {
       activeSlotsDialogue[i] = [];
-      activeSlotsSpecial[i] = [];
     }
     sendMessage("data", { data, time, overlay })
   } else if (action === "time") {
