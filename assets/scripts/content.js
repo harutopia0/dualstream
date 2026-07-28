@@ -241,25 +241,44 @@ function parseLines(text, ext) {
     let fmt = { start: 1, end: 2, text: 9, style: -1, name: -1 }
     let playResX = 1920;
     let playResY = 1080;
+    let currentSection = "";
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim()
-      
-      if (line.startsWith("PlayResX:")) {
+      if (!line) continue;
+
+      if (line.startsWith("[") && line.endsWith("]")) {
+        currentSection = line.toLowerCase();
+        continue;
+      }
+
+      if (currentSection === "[fonts]" || currentSection === "[graphics]") {
+        continue;
+      }
+
+      const lowerLine = line.toLowerCase();
+
+      if (lowerLine.startsWith("playresx:")) {
         const val = parseInt(line.substring(9).trim(), 10);
         if (!isNaN(val) && val > 0) playResX = val;
-      } else if (line.startsWith("PlayResY:")) {
+      } else if (lowerLine.startsWith("playresy:")) {
         const val = parseInt(line.substring(9).trim(), 10);
         if (!isNaN(val) && val > 0) playResY = val;
-      } else if (line.startsWith("Format:")) {
-        const cols = line.substring(7).split(",").map(c => c.trim())
-        fmt.start = cols.indexOf("Start")
-        fmt.end = cols.indexOf("End")
-        fmt.text = cols.indexOf("Text")
-        fmt.style = cols.indexOf("Style")
-        fmt.name = cols.indexOf("Name")
+      } else if (lowerLine.startsWith("format:")) {
+        const colonIdx = line.indexOf(":");
+        const cols = line.substring(colonIdx + 1).split(",").map(c => c.trim())
+        const startIdx = cols.findIndex(c => c.toLowerCase() === "start")
+        const textIdx = cols.findIndex(c => c.toLowerCase() === "text")
+        if (startIdx > -1 && textIdx > -1) {
+          fmt.start = startIdx
+          fmt.end = cols.findIndex(c => c.toLowerCase() === "end")
+          fmt.text = textIdx
+          fmt.style = cols.findIndex(c => c.toLowerCase() === "style")
+          fmt.name = cols.findIndex(c => c.toLowerCase() === "name")
+        }
       } 
-      else if (line.startsWith("Dialogue:")) {
-        const dataStr = line.substring(9).trim()
+      else if (lowerLine.startsWith("dialogue:")) {
+        const colonIdx = line.indexOf(":");
+        const dataStr = line.substring(colonIdx + 1).trim()
         const parts = splitAssDialogue(dataStr, fmt.text > -1 ? fmt.text + 1 : 10)
         
         if (fmt.start > -1 && fmt.text > -1 && parts.length > fmt.text) {
@@ -340,6 +359,26 @@ function parseLines(text, ext) {
               alignment: parsedAlignment,
               playResX: playResX,
               playResY: playResY
+            };
+          } else if (parsedAlignment >= 7 && parsedAlignment <= 9) {
+            const xMap = { 7: playResX * 0.05, 8: playResX * 0.5, 9: playResX * 0.95 };
+            const pctMap = { 7: 5, 8: 50, 9: 95 };
+            pos = {
+              x: xMap[parsedAlignment],
+              y: playResY * 0.05,
+              alignment: parsedAlignment,
+              leftPercent: pctMap[parsedAlignment],
+              topPercent: 5
+            };
+          } else if (parsedAlignment >= 4 && parsedAlignment <= 6) {
+            const xMap = { 4: playResX * 0.05, 5: playResX * 0.5, 6: playResX * 0.95 };
+            const pctMap = { 4: 5, 5: 50, 6: 95 };
+            pos = {
+              x: xMap[parsedAlignment],
+              y: playResY * 0.5,
+              alignment: parsedAlignment,
+              leftPercent: pctMap[parsedAlignment],
+              topPercent: 50
             };
           }
           
