@@ -518,7 +518,7 @@ class DualStreamAudioEngine {
     this.selectedTrackIndex = 0;
 
     this.enabled = false;
-    this.mode = "buffer"; // Default to buffer mode for 100% instant seekability across all formats
+    this.mode = "stream"; // Default to stream mode for minimal RAM & natural pitch across all speeds
     this.volume = 1.0;
     this.isMuted = false;
     this.delay = 0.0; // in seconds
@@ -853,8 +853,8 @@ class DualStreamAudioEngine {
     this.ensureAudioContext();
 
     const now = performance.now();
-    // Debounce rapid micro-restarts within 120ms if offset hasn't significantly jumped
-    if (this.isBufferPlaying && now - this.lastSeekTime < 120 && Math.abs(offset - this.bufferStartOffset) < 0.2) {
+    // Debounce micro-restarts within 100ms if offset is virtually identical
+    if (this.isBufferPlaying && now - this.lastSeekTime < 100 && Math.abs(offset - this.bufferStartOffset) < 0.05) {
       return;
     }
 
@@ -875,17 +875,17 @@ class DualStreamAudioEngine {
       this.bufferSourceNode.playbackRate.value = this.videoTarget.playbackRate;
       this.bufferSourceNode.connect(this.gainNode);
       this.bufferStartTime = this.audioContext.currentTime;
-      this.bufferStartOffset = offset;
+      this.bufferStartOffset = Math.max(0, offset);
       this.bufferPlaybackRate = this.videoTarget.playbackRate;
-      this.bufferSourceNode.start(0, Math.max(0, offset));
+      this.bufferSourceNode.start(0, this.bufferStartOffset);
       this.isBufferPlaying = true;
       this.lastSeekTime = now;
     }
   }
 
   getBufferCurrentTime() {
-    if (!this.isBufferPlaying || !this.audioContext) return this.bufferStartOffset;
-    const elapsed = (this.audioContext.currentTime - this.bufferStartTime) * this.bufferPlaybackRate;
+    if (!this.isBufferPlaying || !this.audioContext || !this.videoTarget) return this.bufferStartOffset;
+    const elapsed = (this.audioContext.currentTime - this.bufferStartTime) * this.videoTarget.playbackRate;
     return this.bufferStartOffset + elapsed;
   }
 
@@ -936,8 +936,8 @@ class DualStreamAudioEngine {
 
     // Check if video is stalled (currentTime unchanged while playing)
     if (v.currentTime === this.lastCheckedVideoTime) {
-      if (now - this.lastVideoProgressTime > 120) {
-        // Video is buffering / frozen on screen -> Pause audio immediately to prevent stutter loop!
+      if (now - this.lastVideoProgressTime > 150) {
+        // Video is buffering / frozen on screen -> Pause audio immediately
         this.pause();
         return;
       }
@@ -948,7 +948,7 @@ class DualStreamAudioEngine {
 
     const targetAudioTime = Math.max(0, v.currentTime - this.delay);
 
-    // 1. Buffer Mode (Instantaneous, sample-accurate seek anywhere)
+    // 1. Buffer Mode (Instantaneous, 100% constant playbackRate, zero pitch shift, zero double-play)
     if (this.mode === "buffer" && this.audioBuffer) {
       if (this.audioElement && !this.audioElement.paused) {
         this.audioElement.pause();
@@ -960,36 +960,32 @@ class DualStreamAudioEngine {
         return;
       }
 
+      // Always maintain exact video playback rate (100% constant - no speed/pitch modifications)
+      if (this.bufferSourceNode && this.bufferSourceNode.playbackRate.value !== v.playbackRate) {
+        this.bufferSourceNode.playbackRate.value = v.playbackRate;
+      }
+
       const currentAudioTime = this.getBufferCurrentTime();
       const drift = currentAudioTime - targetAudioTime;
       const timeSinceSeek = now - this.lastSeekTime;
 
-      // During the initial 350ms settle window after resume/seek, do not perform hard-restarts unless drift > 0.5s
-      if (timeSinceSeek < 350) {
+      // During the initial 500ms window after resume/seek, never restart unless user made a real seek (> 0.5s)
+      if (timeSinceSeek < 500) {
         if (forceHardSeek || Math.abs(drift) > 0.5) {
           this.playBuffer(targetAudioTime);
         }
         return;
       }
 
-      // Settled playback:
-      if (forceHardSeek || Math.abs(drift) > 0.35) {
-        // Genuine jump by user (±5s button, arrow keys, timeline scrub)
+      // Steady playback:
+      // If natural DAC clock drift accumulates beyond 0.15s (150ms) over minutes, snap sample-accurately in 0ms
+      if (forceHardSeek || Math.abs(drift) > 0.15) {
         this.playBuffer(targetAudioTime);
-      } else if (Math.abs(drift) > 0.015) {
-        // Micro-drift rate adjustment - zero audio restarts!
-        const speedCorrection = 1.0 - (drift * 0.4);
-        const clampedSpeed = Math.max(0.95, Math.min(1.05, speedCorrection));
-        this.bufferSourceNode.playbackRate.value = v.playbackRate * clampedSpeed;
-      } else {
-        if (this.bufferSourceNode.playbackRate.value !== v.playbackRate) {
-          this.bufferSourceNode.playbackRate.value = v.playbackRate;
-        }
       }
       return;
     }
 
-    // 2. Stream Mode (HTML5 Audio tag)
+    // 2. Stream Mode (HTML5 Audio tag with Chromium native pitch-preserving SoundTouch)
     if (this.mode === "stream" && this.audioElement) {
       const audio = this.audioElement;
       if (audio.readyState < 1) return;
@@ -997,7 +993,7 @@ class DualStreamAudioEngine {
       const audioTime = audio.currentTime;
       const drift = audioTime - targetAudioTime;
 
-      if (forceHardSeek) {
+      if (forceHardSeek || Math.abs(drift) > 0.3) {
         audio.currentTime = targetAudioTime;
         audio.playbackRate = v.playbackRate;
         this.lastSeekRequestTime = now;
@@ -1009,19 +1005,10 @@ class DualStreamAudioEngine {
 
       if (audio.seeking) return;
 
-      if (Math.abs(drift) > 0.08) {
-        // Jump detected (e.g. ±5s button or arrow keys)
-        if (now - this.lastSeekRequestTime > 150) {
-          audio.currentTime = targetAudioTime;
-          audio.playbackRate = v.playbackRate;
-          this.lastSeekRequestTime = now;
-          if (audio.paused && !v.paused) {
-            audio.play().catch(() => {});
-          }
-        }
-      } else if (Math.abs(drift) > 0.02) {
-        const speedCorrection = 1.0 - (drift * 0.4);
-        const clampedSpeed = Math.max(0.96, Math.min(1.04, speedCorrection));
+      if (Math.abs(drift) > 0.03) {
+        // Mild rate correction (Chromium preserves pitch natively on <audio>)
+        const speedCorrection = 1.0 - (drift * 0.15);
+        const clampedSpeed = Math.max(0.97, Math.min(1.03, speedCorrection));
         audio.playbackRate = v.playbackRate * clampedSpeed;
         if (audio.paused && !v.paused) {
           audio.play().catch(() => {});

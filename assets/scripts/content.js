@@ -36,7 +36,7 @@ const data = {
     volume: 1.0,
     isMuted: false,
     delay: 0.0,
-    mode: "buffer"
+    mode: "stream"
   }
 }
 const time = { current: 0, duration: 0, sync: [0, 0] }

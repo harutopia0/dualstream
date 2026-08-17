@@ -88,17 +88,17 @@
                 <div class="audio-control-group">
                     <div class="audio-group-title">Engine Mode</div>
                     <div class="audio-mode-selector">
-                        <label class="mode-label"><input type="radio" name="audioEngineMode" value="buffer" checked> Buffer Mode</label>
-                        <label class="mode-label"><input type="radio" name="audioEngineMode" value="stream"> Stream Mode</label>
+                        <label class="mode-label"><input type="radio" name="audioEngineMode" value="stream" checked> Stream Mode</label>
+                        <label class="mode-label"><input type="radio" name="audioEngineMode" value="buffer"> Buffer Mode</label>
                     </div>
                     <div class="audio-mode-help">
                         <div class="mode-help-row">
-                            <span class="mode-tag buffer">Buffer</span>
-                            <span class="mode-desc">Instant 0ms seek & exact sync. Best for anime (&lt; 1h).</span>
-                        </div>
-                        <div class="mode-help-row">
                             <span class="mode-tag stream">Stream</span>
                             <span class="mode-desc">Uses minimal RAM. Best for 2h+ movies & low-end PCs.</span>
+                        </div>
+                        <div class="mode-help-row">
+                            <span class="mode-tag buffer">Buffer</span>
+                            <span class="mode-desc">Instant 0ms seek & exact sync. Best for anime (&lt; 1h).</span>
                         </div>
                     </div>
                 </div>
