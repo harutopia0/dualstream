@@ -985,7 +985,7 @@ class DualStreamAudioEngine {
       return;
     }
 
-    // 2. Stream Mode (HTML5 Audio tag with Chromium native pitch-preserving SoundTouch)
+    // 2. Stream Mode (HTML5 Audio tag, 100% constant playbackRate, zero pitch shift)
     if (this.mode === "stream" && this.audioElement) {
       const audio = this.audioElement;
       if (audio.readyState < 1) return;
@@ -993,33 +993,22 @@ class DualStreamAudioEngine {
       const audioTime = audio.currentTime;
       const drift = audioTime - targetAudioTime;
 
-      if (forceHardSeek || Math.abs(drift) > 0.3) {
-        audio.currentTime = targetAudioTime;
+      // Always maintain exact video playback rate (100% constant - no micro rate adjustments)
+      if (audio.playbackRate !== v.playbackRate) {
         audio.playbackRate = v.playbackRate;
-        this.lastSeekRequestTime = now;
-        if (audio.paused && !v.paused) {
-          audio.play().catch(() => {});
-        }
-        return;
+      }
+
+      if (audio.paused && !v.paused) {
+        audio.play().catch(() => {});
       }
 
       if (audio.seeking) return;
 
-      if (Math.abs(drift) > 0.03) {
-        // Mild rate correction (Chromium preserves pitch natively on <audio>)
-        const speedCorrection = 1.0 - (drift * 0.15);
-        const clampedSpeed = Math.max(0.97, Math.min(1.03, speedCorrection));
-        audio.playbackRate = v.playbackRate * clampedSpeed;
-        if (audio.paused && !v.paused) {
-          audio.play().catch(() => {});
-        }
-      } else {
-        if (audio.playbackRate !== v.playbackRate) {
-          audio.playbackRate = v.playbackRate;
-        }
-        if (audio.paused && !v.paused) {
-          audio.play().catch(() => {});
-        }
+      // Steady playback:
+      // If natural clock drift accumulates beyond 0.15s (150ms) over minutes, snap cleanly
+      if (forceHardSeek || Math.abs(drift) > 0.15) {
+        audio.currentTime = targetAudioTime;
+        this.lastSeekRequestTime = now;
       }
     }
   }
