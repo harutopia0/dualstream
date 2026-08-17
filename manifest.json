@@ -22,6 +22,7 @@
         "<all_urls>"
       ],
       "js": [
+        "assets/scripts/subtitle-parser.js",
         "assets/scripts/audio-engine.js",
         "assets/scripts/content.js"
       ],
