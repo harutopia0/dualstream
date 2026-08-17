@@ -9,12 +9,13 @@
     <link rel="stylesheet" href="./assets/fonts/fonts.css">
     <link rel="stylesheet" href="./index.css">
     <script src="./index.js" type="module" defer></script>
-    <title>DualSubStream</title>
+    <title>DualStream</title>
 </head>
 <body id="app" data-tab="upload">
-    <div class="error">DualSubStream is not available on this page.</div>
+    <div class="error">DualStream is not available on this page.</div>
     <div class="tabs">
-        <div class="tab upload">Upload</div>
+        <div class="tab upload">Subtitles</div>
+        <div class="tab audio">Audio</div>
         <div class="tab timing">Timing</div>
         <div class="tab settings">Settings</div>
     </div>
@@ -27,6 +28,84 @@
             </div>
             <div class="upload-tray">
                 <div class="upload-tray-text"></div>
+            </div>
+        </div>
+        <div class="section audio" data-audio-loaded="false" data-audio-loading="false">
+            <div class="audio-loading-card" id="audio-loading-card">
+                <div class="audio-spinner"></div>
+                <div class="audio-loading-title">Processing Audio File...</div>
+                <div class="audio-loading-desc" id="audio-loading-desc">Decoding audio stream & aligning timestamps</div>
+            </div>
+
+            <div class="audio-card">
+                <div class="audio-file-header">
+                    <div class="audio-file-info">
+                        <div class="audio-file-name" id="audio-file-name">No file selected</div>
+                        <div class="audio-file-meta" id="audio-file-meta">MKV, MP4, WebM, MKA, MP3, WAV, AAC...</div>
+                    </div>
+                    <button class="remove-btn" id="audio-remove-btn">Remove</button>
+                </div>
+
+                <div class="audio-toggle-row">
+                    <span class="audio-toggle-label">Enable Audio Replacement</span>
+                    <label class="switch">
+                        <input type="checkbox" id="audio-enable-toggle" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="audio-control-group" id="audio-track-group">
+                    <div class="audio-group-title">Audio Track</div>
+                    <select id="audio-track-select" class="audio-select"></select>
+                </div>
+
+                <div class="audio-control-group">
+                    <div class="audio-group-title-row">
+                        <span class="audio-group-title">Volume</span>
+                        <span class="audio-value-badge" id="audio-volume-text">100%</span>
+                    </div>
+                    <div class="audio-slider-row">
+                        <button class="audio-mute-btn" id="audio-mute-btn" title="Mute/Unmute">🔊</button>
+                        <input type="range" id="audio-volume" min="0" max="150" value="100" class="audio-range">
+                    </div>
+                </div>
+
+                <div class="audio-control-group">
+                    <div class="timing-sync-container">
+                        <div class="timing-sync-desc" id="audio-delay-reset">Audio Delay (in ms), click here to reset</div>
+                        <div class="timing-sync">
+                            <button class="sync-btn audio-sync-btn size-1000" data-audio-amount="-1000">-1s</button>
+                            <button class="sync-btn audio-sync-btn size-500" data-audio-amount="-500">-500</button>
+                            <button class="sync-btn audio-sync-btn size-100" data-audio-amount="-100">-100</button>
+                            <input class="timing-sync-input" type="text" id="audio-delay" value="0">
+                            <button class="sync-btn audio-sync-btn size-100" data-audio-amount="100">+100</button>
+                            <button class="sync-btn audio-sync-btn size-500" data-audio-amount="500">+500</button>
+                            <button class="sync-btn audio-sync-btn size-1000" data-audio-amount="1000">+1s</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="audio-control-group">
+                    <div class="audio-group-title">Engine Mode</div>
+                    <div class="audio-mode-selector">
+                        <label class="mode-label"><input type="radio" name="audioEngineMode" value="buffer" checked> Buffer Mode</label>
+                        <label class="mode-label"><input type="radio" name="audioEngineMode" value="stream"> Stream Mode</label>
+                    </div>
+                    <div class="audio-mode-help">
+                        <div class="mode-help-row">
+                            <span class="mode-tag buffer">Buffer</span>
+                            <span class="mode-desc">Instant 0ms seek & exact sync. Best for anime (&lt; 1h).</span>
+                        </div>
+                        <div class="mode-help-row">
+                            <span class="mode-tag stream">Stream</span>
+                            <span class="mode-desc">Uses minimal RAM. Best for 2h+ movies & low-end PCs.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="audio-upload-tray" id="audio-upload-tray">
+                <div class="audio-upload-tray-text"></div>
             </div>
         </div>
         <div class="section timing">

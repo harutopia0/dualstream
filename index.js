@@ -57,6 +57,62 @@ function syncRadioButtons(value) {
     });
 }
 
+function updateAudioUI(audio) {
+    if (!audio) return;
+    const isLoaded = !!audio.fileName;
+    const isLoading = !!audio.loading;
+    const audioSection = qs(".section.audio");
+    if (audioSection) {
+        audioSection.setAttribute("data-audio-loaded", isLoaded ? "true" : "false");
+        audioSection.setAttribute("data-audio-loading", isLoading ? "true" : "false");
+    }
+
+    const loadingDesc = qs("#audio-loading-desc");
+    if (loadingDesc && audio.loadingFileName) {
+        loadingDesc.textContent = `Reading & decoding ${audio.loadingFileName}...`;
+    }
+
+    if (isLoaded) {
+        const fileNameEl = qs("#audio-file-name");
+        const fileMetaEl = qs("#audio-file-meta");
+        const toggleEl = qs("#audio-enable-toggle");
+        const trackSelect = qs("#audio-track-select");
+        const trackGroup = qs("#audio-track-group");
+        const volumeSlider = qs("#audio-volume");
+        const volumeText = qs("#audio-volume-text");
+        const muteBtn = qs("#audio-mute-btn");
+        const delayInput = qs("#audio-delay");
+
+        if (fileNameEl) fileNameEl.textContent = audio.fileName;
+        if (fileMetaEl) fileMetaEl.textContent = `${audio.format || ''} • ${audio.fileSize || ''}`.trim();
+        if (toggleEl) toggleEl.checked = !!audio.enabled;
+
+        if (trackSelect && audio.tracks && audio.tracks.length > 0) {
+            trackSelect.innerHTML = audio.tracks.map((t, idx) => 
+                `<option value="${idx}" ${idx === audio.selectedTrack ? 'selected' : ''}>${t.name || ('Track ' + (idx + 1))} (${t.language || 'UND'}, ${t.codec || 'Audio'}, ${t.channels || 'Stereo'})</option>`
+            ).join('');
+            if (trackGroup) trackGroup.style.display = audio.tracks.length > 1 ? "flex" : "none";
+        }
+
+        const volPct = Math.round((audio.volume ?? 1.0) * 100);
+        if (volumeSlider) volumeSlider.value = volPct;
+        if (volumeText) volumeText.textContent = `${volPct}%`;
+
+        if (muteBtn) {
+            muteBtn.textContent = audio.isMuted ? "🔇" : "🔊";
+            muteBtn.classList.toggle("muted", !!audio.isMuted);
+        }
+
+        if (delayInput && document.activeElement !== delayInput) {
+            delayInput.value = Math.round((audio.delay || 0) * 1000);
+        }
+
+        qa('input[name="audioEngineMode"]').forEach(r => {
+            r.checked = (r.value === (audio.mode || 'stream'));
+        });
+    }
+}
+
 chrome.runtime.onMessage.addListener(message => {
   if (!message) { return }
   const type = message.type
@@ -89,6 +145,11 @@ chrome.runtime.onMessage.addListener(message => {
     
     if (states.tab === "upload" || states.tab === "timing") { 
         onTiming(data.subs[states.activeSub] || []) 
+    }
+    
+    // Update audio UI if present
+    if (data.audio) {
+        updateAudioUI(data.audio)
     }
     
     const validSubs = [];
@@ -141,6 +202,12 @@ chrome.runtime.onMessage.addListener(message => {
     if (states.tab !== "timing" && document.activeElement !== qs("#sync")) { 
       qs("#sync").value = Math.round((time.sync[states.activeSub] || 0) * 1000) 
     }
+    if (message.data.audio && document.activeElement !== qs("#audio-delay")) {
+      const audioDelayInput = qs("#audio-delay");
+      if (audioDelayInput) {
+        audioDelayInput.value = Math.round((message.data.audio.delay || 0) * 1000);
+      }
+    }
     qs(".upload-preview-time").innerHTML = `${toTimeString(time.current)} / ${toTimeString(time.duration)}`
   }
 })
@@ -149,6 +216,13 @@ qs(".upload-tray").addEventListener("click", (e) => {
   if (e.currentTarget.classList.contains("locked")) return;
   sendMessage("upload");
 })
+
+const audioUploadTray = qs("#audio-upload-tray");
+if (audioUploadTray) {
+  audioUploadTray.addEventListener("click", () => {
+    sendMessage("audio_upload");
+  });
+}
 
 const scrollToActive = () => {
   const container = qs(".timing-lines")
@@ -402,10 +476,124 @@ qs("#sync").addEventListener("keydown", event => {
 
 const onInit = () => setInterval(() => sendMessage("time"), 100)
 
+// Audio Controls Listeners
+const audioRemoveBtn = qs("#audio-remove-btn");
+if (audioRemoveBtn) {
+  audioRemoveBtn.addEventListener("click", () => {
+    sendMessage("audio_remove");
+  });
+}
+
+const audioToggle = qs("#audio-enable-toggle");
+if (audioToggle) {
+  audioToggle.addEventListener("change", () => {
+    sendMessage("audio_toggle");
+  });
+}
+
+const audioTrackSelect = qs("#audio-track-select");
+if (audioTrackSelect) {
+  audioTrackSelect.addEventListener("change", (e) => {
+    const idx = parseInt(e.target.value);
+    sendMessage("audio_select_track", { trackIndex: idx });
+  });
+}
+
+const audioVolumeSlider = qs("#audio-volume");
+if (audioVolumeSlider) {
+  audioVolumeSlider.addEventListener("input", (e) => {
+    const val = parseInt(e.target.value);
+    const volumeBadge = qs("#audio-volume-text");
+    if (volumeBadge) volumeBadge.textContent = `${val}%`;
+    sendMessage("audio_update", { volume: val / 100 });
+  });
+}
+
+const audioMuteBtn = qs("#audio-mute-btn");
+if (audioMuteBtn) {
+  audioMuteBtn.addEventListener("click", () => {
+    const isCurrentlyMuted = audioMuteBtn.classList.contains("muted");
+    sendMessage("audio_update", { isMuted: !isCurrentlyMuted });
+  });
+}
+
+function adjustAudioDelay(deltaMs) {
+  const currentMs = parseFloat(qs("#audio-delay").value) || 0;
+  const newMs = currentMs + deltaMs;
+  qs("#audio-delay").value = newMs;
+  const amount = newMs / 1000;
+  sendMessage("audio_update", { delay: amount });
+}
+
+function makeRepeatableAudio(btn, amount) {
+  let timerId = null;
+  let intervalId = null;
+  
+  const start = (e) => {
+    if (e.button !== 0) return;
+    adjustAudioDelay(amount);
+    timerId = setTimeout(() => {
+      intervalId = setInterval(() => {
+        adjustAudioDelay(amount);
+      }, 60);
+    }, 350);
+  };
+  
+  const stop = () => {
+    clearTimeout(timerId);
+    clearInterval(intervalId);
+  };
+  
+  btn.addEventListener("mousedown", start);
+  btn.addEventListener("mouseup", stop);
+  btn.addEventListener("mouseleave", stop);
+}
+
+qa(".audio-sync-btn[data-audio-amount]").forEach(btn => {
+  const amount = parseInt(btn.getAttribute("data-audio-amount"));
+  makeRepeatableAudio(btn, amount);
+});
+
+const audioDelayReset = qs("#audio-delay-reset");
+if (audioDelayReset) {
+  audioDelayReset.addEventListener("click", () => {
+    qs("#audio-delay").value = 0;
+    sendMessage("audio_update", { delay: 0 });
+  });
+}
+
+const audioDelayInput = qs("#audio-delay");
+if (audioDelayInput) {
+  audioDelayInput.addEventListener("input", event => {
+    const ms = evaluateMath(event.target.value);
+    const amount = ms / 1000;
+    sendMessage("audio_update", { delay: amount });
+  });
+
+  audioDelayInput.addEventListener("blur", event => {
+    const ms = evaluateMath(event.target.value);
+    event.target.value = Math.round(ms);
+  });
+
+  audioDelayInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      const ms = evaluateMath(event.target.value);
+      event.target.value = Math.round(ms);
+      event.target.blur();
+    }
+  });
+}
+
+qa('input[name="audioEngineMode"]').forEach(radio => {
+  radio.addEventListener("change", (e) => {
+    sendMessage("audio_update", { mode: e.target.value });
+  });
+});
+
 const checkLoop = () => {
   sendMessage("info").then(() => {
     setTimeout(() => { if (!states.iframe) { checkLoop() } }, 100)
   })
 }
 
-checkLoop()
+checkLoop()

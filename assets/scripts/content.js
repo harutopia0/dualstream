@@ -456,7 +456,27 @@ const applyStyle = (element, current, history = null) => {
 
 
 
-const data = { init: false, target: null, name: "none", names: [null, null], subs: [null, null] }
+const audioEngine = typeof window.DualStreamAudioEngine !== "undefined" ? new window.DualStreamAudioEngine() : null
+
+const data = {
+  init: false,
+  target: null,
+  name: "none",
+  names: [null, null],
+  subs: [null, null],
+  audio: {
+    enabled: false,
+    fileName: null,
+    fileSize: null,
+    format: null,
+    tracks: [],
+    selectedTrack: 0,
+    volume: 1.0,
+    isMuted: false,
+    delay: 0.0,
+    mode: "buffer"
+  }
+}
 const time = { current: 0, duration: 0, sync: [0, 0] }
 function getPosTransform(an) {
   const map = {
@@ -517,6 +537,11 @@ const update = () => {
   if (video && document.body.contains(video)) {
     time.current = video.currentTime
     time.duration = video.duration
+    
+    // Sync audio replacement if active
+    if (audioEngine && data.audio && data.audio.enabled) {
+      audioEngine.syncWithVideo();
+    }
     
     let allPosMarkup = "";
     for (let i = 0; i < 2; i++) {
@@ -654,11 +679,20 @@ const update = () => {
 }
 const onElement = () => {
   const elements = Array.from(document.querySelectorAll("video"))
-  const durations = elements.map(item => item.duration).filter(item => !isNaN(item)).filter(item => item > 10)
+  const durations = elements.map(item => item.duration).filter(item => !isNaN(item)).filter(item => item > 60)
   if (durations.length === 0) { return }
   const maximum = Math.max(...durations)
   if (data.target && document.body.contains(data.target) && data.target.duration === maximum) { return }
-  data.target = elements.find(item => item.duration === maximum && document.body.contains(item))
+  const newTarget = elements.find(item => item.duration === maximum && document.body.contains(item))
+  if (newTarget) {
+    data.target = newTarget
+    if (audioEngine) {
+      audioEngine.attachVideo(newTarget)
+      if (data.audio && data.audio.enabled) {
+        audioEngine.enable(newTarget)
+      }
+    }
+  }
 }
 
 const onUpload = () => {
@@ -693,6 +727,136 @@ const onUpload = () => {
   })
 }
 
+const showAudioToast = (title, message, type = "loading", duration = 0) => {
+  let toast = document.getElementById("-ext-audio-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "-ext-audio-toast";
+    toast.style.cssText = `
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 2147483647;
+      background: rgba(24, 24, 24, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #ffffff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.12);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Ubuntu", sans-serif;
+      font-size: 13px;
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      opacity: 0;
+      transform: translateY(-8px);
+      max-width: 380px;
+    `;
+    document.body.appendChild(toast);
+  }
+
+  if (data.target && document.body.contains(data.target)) {
+    const parent = data.target.parentElement;
+    if (parent && parent !== document.body) {
+      if (getComputedStyle(parent).position === "static") {
+        parent.style.position = "relative";
+      }
+      if (toast.parentElement !== parent) {
+        parent.appendChild(toast);
+      }
+    }
+  }
+
+  let iconHtml = "";
+  if (type === "loading") {
+    iconHtml = `<div style="width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.2); border-top: 2.5px solid #9b8ff3; border-radius: 50%; animation: ext-spin 0.8s linear infinite; flex-shrink: 0;"></div>`;
+  } else if (type === "success") {
+    iconHtml = `<div style="width: 20px; height: 20px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0; color: #FFF;">✓</div>`;
+  } else if (type === "error") {
+    iconHtml = `<div style="width: 20px; height: 20px; background: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0; color: #FFF;">✕</div>`;
+  }
+
+  toast.innerHTML = `
+    ${iconHtml}
+    <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
+      <div style="font-weight: 700; font-size: 12px; color: #9b8ff3; letter-spacing: 0.3px;">${title}</div>
+      <div style="font-size: 11.5px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${message}</div>
+    </div>
+  `;
+
+  if (!document.getElementById("-ext-spin-style")) {
+    const style = document.createElement("style");
+    style.id = "-ext-spin-style";
+    style.textContent = `@keyframes ext-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+    document.head.appendChild(style);
+  }
+
+  toast.style.display = "flex";
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+  });
+
+  if (toast._timeout) clearTimeout(toast._timeout);
+  if (duration > 0) {
+    toast._timeout = setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateY(-8px)";
+      setTimeout(() => {
+        if (toast.style.opacity === "0") toast.style.display = "none";
+      }, 300);
+    }, duration);
+  }
+};
+
+const onAudioUpload = () => {
+  return new Promise(resolve => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = ".mkv,.mp4,.webm,.mka,.m4a,.aac,.opus,.ogg,.wav,.mp3,.flac"
+    input.multiple = false
+    input.addEventListener("input", async () => {
+      const file = input.files[0]
+      if (!file) return resolve()
+      
+      data.audio.loading = true
+      data.audio.loadingFileName = file.name
+      sendMessage("data", { data, time, overlay })
+
+      showAudioToast("DualStream • Audio", `Reading & decoding ${file.name}...`, "loading", 0)
+
+      onElement()
+      if (audioEngine) {
+        try {
+          const fileInfo = await audioEngine.loadFile(file)
+          data.audio.fileName = fileInfo.fileName
+          data.audio.fileSize = fileInfo.fileSize
+          data.audio.format = fileInfo.format
+          data.audio.tracks = fileInfo.tracks
+          data.audio.selectedTrack = fileInfo.selectedTrack
+          data.audio.enabled = true
+          data.audio.loading = false
+
+          if (data.target) {
+            audioEngine.enable(data.target)
+          }
+          showAudioToast("DualStream • Audio", `${file.name} ready & synced!`, "success", 3000)
+        } catch (e) {
+          data.audio.loading = false
+          showAudioToast("DualStream • Audio", `Error loading audio: ${e.message || e}`, "error", 4000)
+        }
+      }
+      
+      sendMessage("data", { data, time, overlay })
+      resolve()
+    })
+    input.click()
+  })
+}
+
 document.addEventListener("fullscreenchange", () => {
   const element = document.fullscreenElement
   if (element && element === data.target) {
@@ -700,7 +864,7 @@ document.addEventListener("fullscreenchange", () => {
       if (!subLines) return;
       const track = document.createElement("track")
       track.kind = "subtitles"
-      track.label = `DualSubStream ${index === 0 ? 'Sub 1' : 'Sub 2'}`
+      track.label = `DualStream ${index === 0 ? 'Sub 1' : 'Sub 2'}`
       track.default = true
       track.className = "-ext-sub-stream-track"
       track.src = createVTT(subLines)
@@ -743,6 +907,60 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     }
   } else if (action === "upload") {
     await onUpload()
+  } else if (action === "audio_upload") {
+    await onAudioUpload()
+  } else if (action === "audio_toggle") {
+    data.audio.enabled = !data.audio.enabled
+    if (audioEngine) {
+      if (data.audio.enabled && data.target) {
+        audioEngine.enable(data.target)
+      } else {
+        audioEngine.disable()
+      }
+    }
+    sendMessage("data", { data, time, overlay })
+  } else if (action === "audio_select_track") {
+    const trackIdx = payload.trackIndex
+    data.audio.selectedTrack = trackIdx
+    if (audioEngine) {
+      audioEngine.selectTrack(trackIdx)
+    }
+    sendMessage("data", { data, time, overlay })
+  } else if (action === "audio_update") {
+    if ("volume" in payload) {
+      data.audio.volume = payload.volume
+      if (audioEngine) audioEngine.setVolume(payload.volume)
+    }
+    if ("isMuted" in payload) {
+      data.audio.isMuted = payload.isMuted
+      if (audioEngine) audioEngine.setMute(payload.isMuted)
+    }
+    if ("delay" in payload) {
+      data.audio.delay = payload.delay
+      if (audioEngine) audioEngine.setDelay(payload.delay)
+    }
+    if ("mode" in payload) {
+      data.audio.mode = payload.mode
+      if (audioEngine) audioEngine.setMode(payload.mode)
+    }
+    sendMessage("data", { data, time, overlay })
+  } else if (action === "audio_remove") {
+    if (audioEngine) {
+      audioEngine.cleanup()
+    }
+    data.audio = {
+      enabled: false,
+      fileName: null,
+      fileSize: null,
+      format: null,
+      tracks: [],
+      selectedTrack: 0,
+      volume: 1.0,
+      isMuted: false,
+      delay: 0.0,
+      mode: "stream"
+    }
+    sendMessage("data", { data, time, overlay })
   } else if (action === "remove") {
     const idx = payload.index
     
@@ -755,7 +973,7 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     activeSlotsDialogue[idx] = [];
     
     data.name = data.names.filter(Boolean).join(" & ") || "none"
-    if (data.names.filter(Boolean).length === 0) {
+    if (data.names.filter(Boolean).length === 0 && !data.audio.fileName) {
       data.init = false
     }
   }
@@ -774,9 +992,24 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     for (let i = 0; i < 2; i++) {
       activeSlotsDialogue[i] = [];
     }
+    if (audioEngine) {
+      audioEngine.cleanup()
+    }
+    data.audio = {
+      enabled: false,
+      fileName: null,
+      fileSize: null,
+      format: null,
+      tracks: [],
+      selectedTrack: 0,
+      volume: 1.0,
+      isMuted: false,
+      delay: 0.0,
+      mode: "stream"
+    }
     sendMessage("data", { data, time, overlay })
   } else if (action === "time") {
-    sendMessage("time", { time })
+    sendMessage("time", { time, audio: data.audio })
   } else {
     if (!data.init) { init() }
     sendMessage("data", { data, time, overlay })

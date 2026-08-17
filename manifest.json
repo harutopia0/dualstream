@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "DualSubStream (Modified by harutopia0)",
-  "description": "Enhance Your Streaming Experience with Custom Subtitles!",
+  "name": "DualStream (Modified by harutopia0)",
+  "description": "Enhance your streaming experience with dual subtitles and custom audio replacement!",
   "version": "1.0",
   "permissions": [
     "activeTab"
@@ -22,6 +22,7 @@
         "<all_urls>"
       ],
       "js": [
+        "assets/scripts/audio-engine.js",
         "assets/scripts/content.js"
       ],
       "all_frames": true
