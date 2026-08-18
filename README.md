@@ -23,7 +23,7 @@
 Open your terminal or command prompt and run:
 
 ```bash
-git clone https://github.com/harutopia0/dualsubstream
+git clone https://github.com/harutopia0/dualstream
 ```
 
 *(Note: If you do not have Git installed, click the green Code button on the GitHub repository page, select Download ZIP, and extract the downloaded archive).*
