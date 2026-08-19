@@ -7,10 +7,15 @@
     flex-direction: column;
     margin: 0px;
     width: 420px;
-    height: 540px;
+    min-width: 420px;
+    max-width: 420px;
+    height: 600px;
+    min-height: 600px;
+    max-height: 600px;
     background-color: #FFF;
     user-select: none;
     font-family: "Ubuntu";
+    overflow: hidden;
 }
 
 .error {
@@ -59,7 +64,7 @@
     cursor: pointer;
 }
 
-#app[data-tab="upload"] .tab.upload, #app[data-tab="audio"] .tab.audio, #app[data-tab="timing"] .tab.timing, #app[data-tab="settings"] .tab.settings {
+#app[data-tab="upload"] .tab.upload, #app[data-tab="audio"] .tab.audio, #app[data-tab="subtitles"] .tab.subtitles, #app[data-tab="settings"] .tab.settings {
     background-color: #FFFE;
     color: #423ee0;
     border-radius: 4px;
@@ -73,7 +78,7 @@
     color: #5544e3;
 }
 
-#app[data-tab="timing"] .tab.timing {
+#app[data-tab="subtitles"] .tab.subtitles {
     color: #6f66e9;
 }
 
@@ -81,11 +86,11 @@
     color: #9b8ff3;
 }
 
-.tab.audio, .tab.timing, .tab.settings {
+.tab.audio, .tab.subtitles, .tab.settings {
     pointer-events: none;
 }
 
-body[data-ready] .tab.audio, body[data-ready] .tab.timing, body[data-ready] .tab.settings {
+body[data-ready] .tab.audio, body[data-ready] .tab.subtitles, body[data-ready] .tab.settings {
     pointer-events: all;
 }
 
@@ -93,88 +98,200 @@ body[data-ready] .tab.audio, body[data-ready] .tab.timing, body[data-ready] .tab
     flex-grow: 1;
     padding: 10px;
     display: flex;
+    flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
     box-sizing: border-box;
-    width: 100%;
+    width: 420px;
+    max-width: 420px;
 }
 
 .section {
     display: none;
     flex-grow: 1;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
-#app[data-tab="upload"] .section.upload, #app[data-tab="audio"] .section.audio, #app[data-tab="timing"] .section.timing, #app[data-tab="settings"] .section.settings {
+#app[data-tab="upload"] .section.upload, #app[data-tab="audio"] .section.audio, #app[data-tab="subtitles"] .section.subtitles, #app[data-tab="settings"] .section.settings {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
-.upload-tray {
-    border: 2px dashed #0003;
-    height: 100px;
+.section.upload {
+    height: 100%;
+}
+
+#app[data-tab="audio"] .sections {
+    overflow-y: hidden;
+}
+
+.upload-card {
+    display: flex;
+    flex-direction: column;
+    background-color: #f2f2f5;
+    border: 1px solid #e0e0e6;
+    border-radius: 12px;
+    padding: 12px 14px;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.upload-subtitles-card {
+    flex: 1.4;
+}
+
+.upload-audio-card {
+    flex: 1;
+}
+
+.upload-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+}
+
+.upload-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #636366;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.upload-card-meta {
+    font-size: 10px;
+    font-weight: 700;
+    color: #423ee0;
+    background-color: #423ee014;
+    padding: 2px 7px;
+    border-radius: 5px;
+    letter-spacing: 0.3px;
+}
+
+/* Fixed Stack Slots for Upload Tab */
+.sub-slot, .audio-slot {
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    flex: 1;
+    display: flex;
+}
+
+.sub-slot[data-loaded="false"] .sub-item {
+    display: none !important;
+}
+
+.sub-slot[data-loaded="false"] .slot-empty {
+    display: flex !important;
+}
+
+.sub-slot[data-loaded="true"] .sub-item {
+    display: flex !important;
+}
+
+.sub-slot[data-loaded="true"] .slot-empty {
+    display: none !important;
+}
+
+.slot-empty {
+    border: 1.5px dashed #c8c8d2;
+    flex: 1;
+    height: 100%;
+    min-height: 75px;
     border-radius: 10px;
-    background-position: center calc(50% - 15px);
-    background-repeat: no-repeat;
-    background-size: 45px auto;
+    background-color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 16px;
+    gap: 14px;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.slot-empty:hover {
+    border-color: #423ee0;
+    background-color: #f6f6fc;
+}
+
+.slot-plus {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    color: #423ee0;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background-color: #423ee012;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-grow: 1;
-    transition: background 0.1s;
+    flex-shrink: 0;
+    transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
-    .upload-tray.ready {
-        cursor: pointer;
-        background-image: url(./assets/images/upload.svg);
-    }
+.slot-empty:hover .slot-plus {
+    transform: scale(1.1);
+    background-color: #423ee0;
+    color: #FFF;
+}
 
-        .upload-tray.ready:hover {
-            background-color: #0000000A;
-        }
+.slot-text-group {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    text-align: left;
+    gap: 3px;
+}
 
-        .upload-tray.ready.locked {
-            background-image: url(./assets/images/lock.svg);
-            pointer-events: none;
-            opacity: 0.6;
-            background-color: #f5f5f5;
-        }
-
-.upload-tray-text {
+.slot-title {
+    font-size: 13.5px;
     font-weight: 700;
-    color: #0005;
+    color: #181818;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-    .upload-tray-text::before {
-        content: "No videos found on this page";
-    }
-
-.upload-tray.ready .upload-tray-text {
-    padding-top: 50px;
-}
-
-    .upload-tray.ready .upload-tray-text::before {
-        content: "Upload your subtitle file here";
-    }
-
-.upload-tray.ready.locked .upload-tray-text::before {
-    content: "Subtitle slots are full";
-}
-
-.upload[data-name="none"] .upload-preview {
-    display: none;
+.slot-sub {
+    font-size: 11px;
+    font-weight: 500;
+    color: #8e8e93;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .upload-preview {
     display: flex;
-    width: 360px;
+    width: 100%;
     flex-direction: column;
     border-radius: 10px;
     background-color: #181818;
-    min-height: 120px;
-    padding: 14px 20px;
-    gap: 10px;
+    padding: 8px 14px;
+    box-sizing: border-box;
+    align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+    min-height: 38px;
 }
 
 .upload-preview-time {
@@ -182,40 +299,222 @@ body[data-ready] .tab.audio, body[data-ready] .tab.timing, body[data-ready] .tab
     align-items: center;
     justify-content: center;
     color: #FFF;
-    font-weight: 500;
-    font-size: 30px;
-    line-height: 30px;
-    padding-bottom: 5px;
+    font-weight: 600;
+    font-size: 22px;
+    line-height: 22px;
 }
 
-.upload-preview-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 100%;
+/* Audio Slot States in Upload Tab */
+.section.upload[data-audio-loaded="false"][data-audio-loading="false"] #audio-upload-tray {
+    display: flex !important;
 }
 
-.sub-item {
-    display: flex;
+.section.upload[data-audio-loaded="false"][data-audio-loading="false"] #upload-audio-loading-card,
+.section.upload[data-audio-loaded="false"][data-audio-loading="false"] #upload-audio-loaded-item {
+    display: none !important;
+}
+
+.section.upload[data-audio-loaded="true"] #upload-audio-loaded-item {
+    display: flex !important;
+}
+
+.section.upload[data-audio-loaded="true"] #audio-upload-tray,
+.section.upload[data-audio-loaded="true"] #upload-audio-loading-card {
+    display: none !important;
+}
+
+.section.upload[data-audio-loading="true"] #upload-audio-loading-card {
+    display: flex !important;
+}
+
+.section.upload[data-audio-loading="true"] #audio-upload-tray,
+.section.upload[data-audio-loading="true"] #upload-audio-loaded-item {
+    display: none !important;
+}
+
+#upload-audio-loading-card {
+    display: none;
+    flex-direction: row;
     align-items: center;
-    justify-content: space-between;
-    background-color: #2a2a2a;
-    padding: 8px 10px;
-    border-radius: 8px;
-    gap: 10px;
+    justify-content: flex-start;
+    padding: 0 16px;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e6;
+    border-radius: 10px;
+    gap: 14px;
+    flex: 1;
+    height: 100%;
+    min-height: 75px;
     width: 100%;
     box-sizing: border-box;
 }
 
-.sub-name-item {
-    color: #FFF;
+#upload-audio-loading-card .audio-spinner {
+    width: 22px;
+    height: 22px;
+    border-width: 3px;
+    flex-shrink: 0;
+}
+
+#upload-audio-loading-card .audio-loading-title {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
+    color: #181818;
+}
+
+#upload-audio-loading-card .audio-loading-desc {
+    font-size: 11px;
+    color: #636366;
+    max-width: 220px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-grow: 1;
+}
+
+.upload-audio-loaded-item {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #ffffff;
+    border: 1px solid #e2e2ea;
+    padding: 12px 16px;
+    border-radius: 10px;
+    gap: 12px;
+    flex: 1;
+    height: 100%;
+    min-height: 75px;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.section.upload[data-audio-loading="false"] #upload-audio-loading-card {
+    display: none;
+}
+
+.upload-audio-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: calc(100% - 75px);
+}
+
+.upload-audio-badge {
+    background-color: #423ee0;
+    color: #FFF;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 5px;
+    flex-shrink: 0;
+}
+
+.upload-audio-details {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    flex: 1 1 0%;
+    gap: 2px;
+}
+
+.upload-audio-name {
+    color: #181818;
+    font-size: 13.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-align: left;
+}
+
+.upload-audio-meta {
+    color: #636366;
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sub-item {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #ffffff;
+    border: 1px solid #e2e2ea;
+    padding: 12px 16px;
+    border-radius: 10px;
+    gap: 12px;
+    flex: 1;
+    height: 100%;
+    min-height: 75px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.upload-sub-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: calc(100% - 75px);
+}
+
+.upload-sub-badge {
+    color: #FFF;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 5px;
+    flex-shrink: 0;
+}
+
+.upload-sub-badge.sub1 {
+    background-color: #423ee0;
+}
+
+.upload-sub-badge.sub2 {
+    background-color: #6f66e9;
+}
+
+.upload-sub-details {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    flex: 1 1 0%;
+    gap: 2px;
+}
+
+.upload-sub-name {
+    color: #181818;
+    font-size: 13.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+.upload-sub-meta {
+    color: #636366;
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .remove-btn {
@@ -449,7 +748,7 @@ input, button {
 
 .timing-lines {
     flex-grow: 1;
-    height: 270px;
+    height: 330px;
     overflow-y: auto;
     padding: 5px 0px 5px 5px;
 }
@@ -677,8 +976,7 @@ input, button {
     display: flex;
 }
 
-.section.audio[data-audio-loading="true"] .audio-card,
-.section.audio[data-audio-loading="true"] .audio-upload-tray {
+.section.audio[data-audio-loading="true"] .audio-card {
     display: none !important;
 }
 
@@ -731,33 +1029,42 @@ input, button {
     white-space: nowrap;
 }
 
-.section.audio[data-audio-loaded="false"] .audio-card {
-    display: none;
-}
-
-.section.audio[data-audio-loaded="false"] .audio-upload-tray {
+.section.audio .audio-card {
     display: flex;
 }
 
-.section.audio[data-audio-loaded="true"] .audio-card {
-    display: flex;
+.section.audio[data-audio-loaded="false"] .audio-card-controls {
+    opacity: 0.45;
+    pointer-events: none;
+    filter: grayscale(0.5);
+    user-select: none;
 }
 
-.section.audio[data-audio-loaded="true"] .audio-upload-tray {
-    display: none;
+.section.audio[data-audio-loaded="true"] .audio-card-controls {
+    opacity: 1;
+    pointer-events: auto;
+    filter: none;
+}
+
+.audio-card-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
 .audio-upload-tray {
     border: 2px dashed #0003;
-    height: 100px;
-    border-radius: 10px;
-    background-position: center calc(50% - 15px);
+    height: 70px;
+    border-radius: 8px;
+    background-position: center calc(50% - 12px);
     background-repeat: no-repeat;
-    background-size: 45px auto;
+    background-size: 32px auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-grow: 1;
     transition: background 0.1s;
     box-sizing: border-box;
     width: 100%;
@@ -775,7 +1082,7 @@ body[data-ready] .audio-upload-tray:hover {
 .audio-upload-tray-text {
     font-weight: 700;
     color: #0005;
-    font-size: 13px;
+    font-size: 12px;
     text-align: center;
 }
 
@@ -784,11 +1091,11 @@ body[data-ready] .audio-upload-tray:hover {
 }
 
 body[data-ready] .audio-upload-tray .audio-upload-tray-text {
-    padding-top: 50px;
+    padding-top: 36px;
 }
 
 body[data-ready] .audio-upload-tray .audio-upload-tray-text::before {
-    content: "Upload your audio file here";
+    content: "Upload audio file (.mkv, .mp4, .mp3, .mka...)";
 }
 
 /* Audio Card - Preserving Original Box Layout with Light Palette */
@@ -802,6 +1109,8 @@ body[data-ready] .audio-upload-tray .audio-upload-tray-text::before {
     gap: 8px;
     width: 100%;
     box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .audio-file-header {
@@ -815,6 +1124,8 @@ body[data-ready] .audio-upload-tray .audio-upload-tray-text::before {
     gap: 8px;
     width: 100%;
     box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .audio-file-info {

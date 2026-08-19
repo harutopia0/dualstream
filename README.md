@@ -40,7 +40,8 @@ git clone https://github.com/harutopia0/dualstream
 ## How to Use
 
 1. Click on the Extension icon on the Chrome toolbar to open **DualStream**.
-2. **Subtitles tab**: Upload up to 2 subtitle files simultaneously for bilingual display.
-3. **Audio tab**: Upload a local video or audio container to replace web video audio with your preferred dub/audio track.
-4. **Timing tab**: Adjust timing offsets with repeatable ±100ms, ±500ms, and ±1s precision buttons.
-5. **Settings tab**: Customize subtitle appearance, colors, fonts, and positions.
+2. **Upload tab**: Upload subtitle files (up to 2 files simultaneously for bilingual display) and local audio files (MKV, MP4, MP3, etc.).
+3. **Audio tab**: Configure audio replacement settings (track selection, volume, audio delay sync, stream/buffer engine modes).
+4. **Subtitles tab**: Fine-tune subtitle sync offsets and view live subtitle lines with one-click timing synchronization.
+5. **Settings tab**: Customize subtitle appearance, colors, fonts, shadows, and screen positions.
+

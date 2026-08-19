@@ -26,6 +26,7 @@ const data = {
   name: "none",
   names: [null, null],
   subs: [null, null],
+  subMeta: [null, null],
   audio: {
     enabled: false,
     fileName: null,
@@ -78,7 +79,12 @@ overlay.inner.forEach((inn, i) => {
     applyStyle(inn.element, inn.style);
 });
 
-const init = () => { data.init = true; update() }
+const init = () => { 
+  if (!data.init) {
+    data.init = true; 
+    update();
+  }
+}
 const update = () => {
   if (data.init) { requestAnimationFrame(update) }
   const video = data.target
@@ -234,6 +240,7 @@ const onElement = () => {
   const newTarget = elements.find(item => item.duration === maximum && document.body.contains(item))
   if (newTarget) {
     data.target = newTarget
+    init()
     if (audioEngine) {
       audioEngine.attachVideo(newTarget)
       if (data.audio && data.audio.enabled) {
@@ -243,7 +250,7 @@ const onElement = () => {
   }
 }
 
-const onUpload = () => {
+const onUpload = (slot = null) => {
   return new Promise(resolve => {
     const input = document.createElement("input")
     input.type = "file"
@@ -255,18 +262,17 @@ const onUpload = () => {
       const reader = new FileReader()
       reader.addEventListener("load", () => {
         const ext = file.name.split('.').pop().toLowerCase()
-        if (!data.subs[0]) {
-          data.names[0] = file.name
-          data.subs[0] = parseLines(reader.result, ext)
-        } else if (!data.subs[1]) {
-          data.names[1] = file.name
-          data.subs[1] = parseLines(reader.result, ext)
-        } else {
-          data.names[1] = file.name
-          data.subs[1] = parseLines(reader.result, ext)
-        }
-        
+        const targetSlot = (slot === 0 || slot === 1) ? slot : (!data.subs[0] ? 0 : (!data.subs[1] ? 1 : 1));
+        data.names[targetSlot] = file.name
+        data.subs[targetSlot] = parseLines(reader.result, ext)
+        if (!data.subMeta) data.subMeta = [null, null];
+        data.subMeta[targetSlot] = {
+          format: ext.toUpperCase(),
+          size: file.size,
+          linesCount: data.subs[targetSlot] ? data.subs[targetSlot].length : 0
+        };
         data.name = data.names.filter(Boolean).join(" & ") || "none"
+        init()
         resolve()
       })
       reader.readAsText(file)
@@ -391,6 +397,7 @@ const onAudioUpload = () => {
           if (data.target) {
             audioEngine.enable(data.target)
           }
+          init()
           showAudioToast("DualStream • Audio", `${file.name} ready & synced!`, "success", 3000)
         } catch (e) {
           data.audio.loading = false
@@ -431,6 +438,7 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
   const action = message.action
   const payload = message.payload
   onElement()
+  init()
   const iframes = document.querySelectorAll("iframe")
   iframes.forEach((iframe) => {
     if (iframe.contentWindow) { iframe.contentWindow.postMessage(message, "*") }
@@ -454,7 +462,7 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
         applyStyle(overlay.inner[subIdx].element, payload.inner, overlay.inner[subIdx].style) 
     }
   } else if (action === "upload") {
-    await onUpload()
+    await onUpload(payload && typeof payload.slot === "number" ? payload.slot : null)
   } else if (action === "audio_upload") {
     await onAudioUpload()
   } else if (action === "audio_toggle") {
@@ -514,6 +522,7 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     
     data.names[idx] = null;
     data.subs[idx] = null;
+    if (data.subMeta) data.subMeta[idx] = null;
     
     time.sync[idx] = 0;
     overlay.inner[idx].element.style.display = "none";

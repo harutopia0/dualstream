@@ -14,22 +14,104 @@
 <body id="app" data-tab="upload">
     <div class="error">DualStream is not available on this page.</div>
     <div class="tabs">
-        <div class="tab upload">Subtitles</div>
+        <div class="tab upload">Upload</div>
         <div class="tab audio">Audio</div>
-        <div class="tab timing">Timing</div>
+        <div class="tab subtitles">Subtitles</div>
         <div class="tab settings">Settings</div>
     </div>
 
     <div class="sections">
-        <div class="section upload" data-name="none">
+        <div class="section upload" data-name="none" data-audio-loaded="false" data-audio-loading="false">
             <div class="upload-preview">
-                <div class="upload-preview-time"></div>
-                <div class="upload-preview-list"></div>
+                <div class="upload-preview-time">00:00:00 / 00:00:00</div>
             </div>
-            <div class="upload-tray">
-                <div class="upload-tray-text"></div>
+
+            <!-- Card 1: Subtitles (Fixed 2-Slot Stack) -->
+            <div class="upload-card upload-subtitles-card">
+                <div class="upload-card-header">
+                    <span class="upload-card-title">Subtitles (Max 2 files)</span>
+                    <span class="upload-card-meta">SRT • VTT • ASS</span>
+                </div>
+                
+                <!-- Sub 1 Slot -->
+                <div class="sub-slot" id="sub-slot-0" data-loaded="false">
+                    <div class="slot-empty" data-slot="0">
+                        <span class="slot-plus">+</span>
+                        <div class="slot-text-group">
+                            <span class="slot-title">Upload Subtitle 1</span>
+                            <span class="slot-sub">Primary subtitle stream (.srt, .vtt, .ass)</span>
+                        </div>
+                    </div>
+                    <div class="sub-item" id="sub-item-0">
+                        <div class="upload-sub-info">
+                            <span class="upload-sub-badge sub1">Sub 1</span>
+                            <div class="upload-sub-details">
+                                <div class="upload-sub-name" id="sub-name-0">No file selected</div>
+                                <div class="upload-sub-meta" id="sub-meta-0">SRT • 0 KB</div>
+                            </div>
+                        </div>
+                        <button class="remove-btn" data-index="0">Remove</button>
+                    </div>
+                </div>
+
+                <!-- Sub 2 Slot -->
+                <div class="sub-slot" id="sub-slot-1" data-loaded="false">
+                    <div class="slot-empty" data-slot="1">
+                        <span class="slot-plus">+</span>
+                        <div class="slot-text-group">
+                            <span class="slot-title">Upload Subtitle 2</span>
+                            <span class="slot-sub">Secondary / bilingual subtitle (optional)</span>
+                        </div>
+                    </div>
+                    <div class="sub-item" id="sub-item-1">
+                        <div class="upload-sub-info">
+                            <span class="upload-sub-badge sub2">Sub 2</span>
+                            <div class="upload-sub-details">
+                                <div class="upload-sub-name" id="sub-name-1">No file selected</div>
+                                <div class="upload-sub-meta" id="sub-meta-1">SRT • 0 KB</div>
+                            </div>
+                        </div>
+                        <button class="remove-btn" data-index="1">Remove</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Audio (Fixed Slot Stack) -->
+            <div class="upload-card upload-audio-card" id="upload-audio-card" data-audio-loaded="false" data-audio-loading="false">
+                <div class="upload-card-header">
+                    <span class="upload-card-title">Audio Replacement</span>
+                    <span class="upload-card-meta">MKV • MP4 • MP3 • MKA</span>
+                </div>
+                
+                <div class="audio-slot" id="audio-slot">
+                    <div class="slot-empty" id="audio-upload-tray">
+                        <span class="slot-plus">+</span>
+                        <div class="slot-text-group">
+                            <span class="slot-title">Upload Audio Track</span>
+                            <span class="slot-sub">Local dub or alternate soundtrack</span>
+                        </div>
+                    </div>
+                    <div class="audio-loading-card" id="upload-audio-loading-card">
+                        <div class="audio-spinner"></div>
+                        <div class="audio-loading-details">
+                            <div class="audio-loading-title">Processing Audio File...</div>
+                            <div class="audio-loading-desc" id="upload-audio-loading-desc">Decoding audio stream</div>
+                        </div>
+                    </div>
+                    <div class="upload-audio-loaded-item" id="upload-audio-loaded-item">
+                        <div class="upload-audio-info">
+                            <span class="upload-audio-badge">Audio</span>
+                            <div class="upload-audio-details">
+                                <div class="upload-audio-name" id="upload-audio-name">No file selected</div>
+                                <div class="upload-audio-meta" id="upload-audio-meta">MKV, MP4, WebM, MKA, MP3...</div>
+                            </div>
+                        </div>
+                        <button class="remove-btn" id="upload-audio-remove-btn">Remove</button>
+                    </div>
+                </div>
             </div>
         </div>
+
         <div class="section audio" data-audio-loaded="false" data-audio-loading="false">
             <div class="audio-loading-card" id="audio-loading-card">
                 <div class="audio-spinner"></div>
@@ -40,75 +122,73 @@
             <div class="audio-card">
                 <div class="audio-file-header">
                     <div class="audio-file-info">
-                        <div class="audio-file-name" id="audio-file-name">No file selected</div>
-                        <div class="audio-file-meta" id="audio-file-meta">MKV, MP4, WebM, MKA, MP3, WAV, AAC...</div>
-                    </div>
-                    <button class="remove-btn" id="audio-remove-btn">Remove</button>
-                </div>
-
-                <div class="audio-toggle-row">
-                    <span class="audio-toggle-label">Enable Audio Replacement</span>
-                    <label class="switch">
-                        <input type="checkbox" id="audio-enable-toggle" checked>
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-
-                <div class="audio-control-group" id="audio-track-group">
-                    <div class="audio-group-title">Audio Track</div>
-                    <select id="audio-track-select" class="audio-select"></select>
-                </div>
-
-                <div class="audio-control-group">
-                    <div class="audio-group-title-row">
-                        <span class="audio-group-title">Volume</span>
-                        <span class="audio-value-badge" id="audio-volume-text">100%</span>
-                    </div>
-                    <div class="audio-slider-row">
-                        <button class="audio-mute-btn" id="audio-mute-btn" title="Mute/Unmute">🔊</button>
-                        <input type="range" id="audio-volume" min="0" max="150" value="100" class="audio-range">
+                        <div class="audio-file-name" id="audio-file-name">No file loaded</div>
+                        <div class="audio-file-meta" id="audio-file-meta">Upload audio file in the Upload tab</div>
                     </div>
                 </div>
 
-                <div class="audio-control-group">
-                    <div class="timing-sync-container">
-                        <div class="timing-sync-desc" id="audio-delay-reset">Audio Delay (in ms), click here to reset</div>
-                        <div class="timing-sync">
-                            <button class="sync-btn audio-sync-btn size-1000" data-audio-amount="-1000">-1s</button>
-                            <button class="sync-btn audio-sync-btn size-500" data-audio-amount="-500">-500</button>
-                            <button class="sync-btn audio-sync-btn size-100" data-audio-amount="-100">-100</button>
-                            <input class="timing-sync-input" type="text" id="audio-delay" value="0">
-                            <button class="sync-btn audio-sync-btn size-100" data-audio-amount="100">+100</button>
-                            <button class="sync-btn audio-sync-btn size-500" data-audio-amount="500">+500</button>
-                            <button class="sync-btn audio-sync-btn size-1000" data-audio-amount="1000">+1s</button>
+                <div class="audio-card-controls">
+                    <div class="audio-toggle-row">
+                        <span class="audio-toggle-label">Enable Audio Replacement</span>
+                        <label class="switch">
+                            <input type="checkbox" id="audio-enable-toggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <div class="audio-control-group" id="audio-track-group">
+                        <div class="audio-group-title">Audio Track</div>
+                        <select id="audio-track-select" class="audio-select"></select>
+                    </div>
+
+                    <div class="audio-control-group">
+                        <div class="audio-group-title-row">
+                            <span class="audio-group-title">Volume</span>
+                            <span class="audio-value-badge" id="audio-volume-text">100%</span>
+                        </div>
+                        <div class="audio-slider-row">
+                            <button class="audio-mute-btn" id="audio-mute-btn" title="Mute/Unmute">🔊</button>
+                            <input type="range" id="audio-volume" min="0" max="150" value="100" class="audio-range">
+                        </div>
+                    </div>
+
+                    <div class="audio-control-group">
+                        <div class="timing-sync-container">
+                            <div class="timing-sync-desc" id="audio-delay-reset">Audio Delay (in ms), click here to reset</div>
+                            <div class="timing-sync">
+                                <button class="sync-btn audio-sync-btn size-1000" data-audio-amount="-1000">-1s</button>
+                                <button class="sync-btn audio-sync-btn size-500" data-audio-amount="-500">-500</button>
+                                <button class="sync-btn audio-sync-btn size-100" data-audio-amount="-100">-100</button>
+                                <input class="timing-sync-input" type="text" id="audio-delay" value="0">
+                                <button class="sync-btn audio-sync-btn size-100" data-audio-amount="100">+100</button>
+                                <button class="sync-btn audio-sync-btn size-500" data-audio-amount="500">+500</button>
+                                <button class="sync-btn audio-sync-btn size-1000" data-audio-amount="1000">+1s</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="audio-control-group">
+                        <div class="audio-group-title">Engine Mode</div>
+                        <div class="audio-mode-selector">
+                            <label class="mode-label"><input type="radio" name="audioEngineMode" value="stream" checked> Stream Mode</label>
+                            <label class="mode-label"><input type="radio" name="audioEngineMode" value="buffer"> Buffer Mode</label>
+                        </div>
+                        <div class="audio-mode-help">
+                            <div class="mode-help-row">
+                                <span class="mode-tag stream">Stream</span>
+                                <span class="mode-desc">Uses minimal RAM. Best for 2h+ movies & low-end PCs.</span>
+                            </div>
+                            <div class="mode-help-row">
+                                <span class="mode-tag buffer">Buffer</span>
+                                <span class="mode-desc">Instant 0ms seek & exact sync. Best for anime (&lt; 1h).</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <div class="audio-control-group">
-                    <div class="audio-group-title">Engine Mode</div>
-                    <div class="audio-mode-selector">
-                        <label class="mode-label"><input type="radio" name="audioEngineMode" value="stream" checked> Stream Mode</label>
-                        <label class="mode-label"><input type="radio" name="audioEngineMode" value="buffer"> Buffer Mode</label>
-                    </div>
-                    <div class="audio-mode-help">
-                        <div class="mode-help-row">
-                            <span class="mode-tag stream">Stream</span>
-                            <span class="mode-desc">Uses minimal RAM. Best for 2h+ movies & low-end PCs.</span>
-                        </div>
-                        <div class="mode-help-row">
-                            <span class="mode-tag buffer">Buffer</span>
-                            <span class="mode-desc">Instant 0ms seek & exact sync. Best for anime (&lt; 1h).</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="audio-upload-tray" id="audio-upload-tray">
-                <div class="audio-upload-tray-text"></div>
             </div>
         </div>
-        <div class="section timing">
+
+        <div class="section subtitles">
             <div class="sub-selector">
                 <label class="radio-label sub1"><input type="radio" name="activeSubTiming" value="0" checked> Sub 1</label>
                 <label class="radio-label sub2"><input type="radio" name="activeSubTiming" value="1"> Sub 2</label>

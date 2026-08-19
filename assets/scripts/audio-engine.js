@@ -76,11 +76,12 @@ class MatroskaParser {
   }
 
   static async scanTracks(file) {
-    const scanSize = Math.min(file.size, 8 * 1024 * 1024);
+    const scanSize = Math.min(file.size, 16 * 1024 * 1024);
     const buffer = await file.slice(0, scanSize).arrayBuffer();
     const view = new DataView(buffer);
     const tracks = [];
 
+    const ID_SEGMENT = 0x18538067;
     const ID_TRACKS = 0x1654AE6B;
     const ID_TRACK_ENTRY = 0xAE;
     const ID_TRACK_NUM = 0xD7;
@@ -94,6 +95,7 @@ class MatroskaParser {
     const ID_SAMPLING_FREQ = 0xB5;
     const ID_CHANNELS = 0x9F;
     const ID_BIT_DEPTH = 0x6264;
+    const ID_CLUSTER = 0x1F43B675;
 
     let offset = 0;
     while (offset < view.byteLength - 4) {
@@ -105,6 +107,16 @@ class MatroskaParser {
       if (!sizeVint) { offset++; continue; }
       offset += sizeVint.length;
       const size = sizeVint.value;
+
+      if (el.id === ID_SEGMENT) {
+        // Step into Segment container
+        continue;
+      }
+
+      if (el.id === ID_CLUSTER) {
+        // Stop scanning when reaching media clusters
+        break;
+      }
 
       if (el.id === ID_TRACKS) {
         let trackOffset = offset;

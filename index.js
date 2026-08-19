@@ -61,6 +61,27 @@ function updateAudioUI(audio) {
     if (!audio) return;
     const isLoaded = !!audio.fileName;
     const isLoading = !!audio.loading;
+
+    // Update section.upload
+    const uploadSection = qs(".section.upload");
+    if (uploadSection) {
+        uploadSection.setAttribute("data-audio-loaded", isLoaded ? "true" : "false");
+        uploadSection.setAttribute("data-audio-loading", isLoading ? "true" : "false");
+    }
+
+    const uploadLoadingDesc = qs("#upload-audio-loading-desc");
+    if (uploadLoadingDesc && audio.loadingFileName) {
+        uploadLoadingDesc.textContent = `Reading & decoding ${audio.loadingFileName}...`;
+    }
+
+    if (isLoaded) {
+        const uploadAudioName = qs("#upload-audio-name");
+        const uploadAudioMeta = qs("#upload-audio-meta");
+        if (uploadAudioName) uploadAudioName.textContent = audio.fileName;
+        if (uploadAudioMeta) uploadAudioMeta.textContent = `${audio.format || ''} • ${audio.fileSize || ''}`.trim();
+    }
+
+    // Update section.audio (pure settings)
     const audioSection = qs(".section.audio");
     if (audioSection) {
         audioSection.setAttribute("data-audio-loaded", isLoaded ? "true" : "false");
@@ -72,27 +93,31 @@ function updateAudioUI(audio) {
         loadingDesc.textContent = `Reading & decoding ${audio.loadingFileName}...`;
     }
 
-    if (isLoaded) {
-        const fileNameEl = qs("#audio-file-name");
-        const fileMetaEl = qs("#audio-file-meta");
-        const toggleEl = qs("#audio-enable-toggle");
-        const trackSelect = qs("#audio-track-select");
-        const trackGroup = qs("#audio-track-group");
-        const volumeSlider = qs("#audio-volume");
-        const volumeText = qs("#audio-volume-text");
-        const muteBtn = qs("#audio-mute-btn");
-        const delayInput = qs("#audio-delay");
+    const fileNameEl = qs("#audio-file-name");
+    const fileMetaEl = qs("#audio-file-meta");
+    const toggleEl = qs("#audio-enable-toggle");
+    const trackSelect = qs("#audio-track-select");
+    const trackGroup = qs("#audio-track-group");
+    const volumeSlider = qs("#audio-volume");
+    const volumeText = qs("#audio-volume-text");
+    const muteBtn = qs("#audio-mute-btn");
+    const delayInput = qs("#audio-delay");
 
+    if (isLoaded) {
         if (fileNameEl) fileNameEl.textContent = audio.fileName;
         if (fileMetaEl) fileMetaEl.textContent = `${audio.format || ''} • ${audio.fileSize || ''}`.trim();
         if (toggleEl) toggleEl.checked = !!audio.enabled;
 
-        if (trackSelect && audio.tracks && audio.tracks.length > 0) {
-            trackSelect.innerHTML = audio.tracks.map((t, idx) => 
-                `<option value="${idx}" ${idx === audio.selectedTrack ? 'selected' : ''}>${t.name || ('Track ' + (idx + 1))} (${t.language || 'UND'}, ${t.codec || 'Audio'}, ${t.channels || 'Stereo'})</option>`
-            ).join('');
-            if (trackGroup) trackGroup.style.display = audio.tracks.length > 1 ? "flex" : "none";
+        if (trackSelect) {
+            if (audio.tracks && audio.tracks.length > 0) {
+                trackSelect.innerHTML = audio.tracks.map((t, idx) => 
+                    `<option value="${idx}" ${idx === audio.selectedTrack ? 'selected' : ''}>${t.name || ('Track ' + (idx + 1))} (${t.language || 'UND'}, ${t.codec || 'Audio'}, ${t.channels || 'Stereo'})</option>`
+                ).join('');
+            } else {
+                trackSelect.innerHTML = `<option value="0">Track 1 (Default Audio)</option>`;
+            }
         }
+        if (trackGroup) trackGroup.style.display = "flex";
 
         const volPct = Math.round((audio.volume ?? 1.0) * 100);
         if (volumeSlider) volumeSlider.value = volPct;
@@ -110,6 +135,11 @@ function updateAudioUI(audio) {
         qa('input[name="audioEngineMode"]').forEach(r => {
             r.checked = (r.value === (audio.mode || 'stream'));
         });
+    } else {
+        if (fileNameEl) fileNameEl.textContent = "No file loaded";
+        if (fileMetaEl) fileMetaEl.textContent = "Upload audio file in the Upload tab";
+        if (trackSelect) trackSelect.innerHTML = `<option value="0">No audio tracks</option>`;
+        if (trackGroup) trackGroup.style.display = "flex";
     }
 }
 
@@ -121,7 +151,8 @@ chrome.runtime.onMessage.addListener(message => {
     const data = message.data
     if (states.iframe === null && data.target) {
       if (data.duration > 60) {
-        qs(".upload-tray").classList.add("ready")
+        const subTray = qs("#sub-upload-tray") || qs(".upload-tray");
+        if (subTray) subTray.classList.add("ready");
         document.body.setAttribute("data-ready", "true")
         states.iframe = { id, duration: data.duration }
         const settings = JSON.parse(localStorage.getItem("settings") || "null")
@@ -143,7 +174,7 @@ chrome.runtime.onMessage.addListener(message => {
     const time = message.data.time
     const overlay = message.data.overlay
     
-    if (states.tab === "upload" || states.tab === "timing") { 
+    if (states.tab === "upload" || states.tab === "subtitles") { 
         onTiming(data.subs[states.activeSub] || []) 
     }
     
@@ -152,44 +183,59 @@ chrome.runtime.onMessage.addListener(message => {
         updateAudioUI(data.audio)
     }
     
-    const validSubs = [];
-    if (data.names[1]) validSubs.push({ idx: 1, name: data.names[1], type: 'Sub 2', color: '#9b8ff3' });
-    if (data.names[0]) validSubs.push({ idx: 0, name: data.names[0], type: 'Sub 1', color: '#423ee0' }); 
+    const formatBytes = (bytes) => {
+        if (!bytes || isNaN(bytes)) return "";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    };
 
-    const isLoaded = validSubs.length > 0;
-    qs(".section.upload").setAttribute("data-name", isLoaded ? "loaded" : "none");
-
-    const uploadTray = qs(".upload-tray");
-    if (validSubs.length >= 2) {
-        uploadTray.classList.add("locked");
-    } else {
-        uploadTray.classList.remove("locked");
+    // Update Sub 1 Slot (index 0)
+    const slot0 = qs("#sub-slot-0");
+    if (slot0) {
+      const isSub0Loaded = !!data.names[0];
+      slot0.setAttribute("data-loaded", isSub0Loaded ? "true" : "false");
+      if (isSub0Loaded) {
+        const subName0 = qs("#sub-name-0");
+        if (subName0) {
+          subName0.textContent = data.names[0];
+          subName0.setAttribute("title", data.names[0]);
+        }
+        const subMeta0 = qs("#sub-meta-0");
+        if (subMeta0) {
+          const meta = data.subMeta && data.subMeta[0];
+          const ext = data.names[0].split('.').pop().toUpperCase();
+          const sizeStr = meta && meta.size ? ` • ${formatBytes(meta.size)}` : "";
+          subMeta0.textContent = `${meta && meta.format ? meta.format : ext}${sizeStr}`;
+        }
+      }
     }
-    
-    const listContainer = qs(".upload-preview-list");
-    if (listContainer) {
-      if (isLoaded) {
-        listContainer.innerHTML = validSubs.map(item => 
-          `<div class="sub-item">
-             <div class="sub-name-item"><span style="color:${item.color}; margin-right: 5px;">[${item.type}]</span>${item.name}</div>
-             <button class="remove-btn" data-index="${item.idx}">Remove</button>
-           </div>`
-        ).join('')
-        qa(".remove-btn").forEach(btn => {
-          btn.addEventListener("click", (e) => {
-            const idx = parseInt(e.currentTarget.getAttribute("data-index"))
-            sendMessage("remove", { index: idx })
-          })
-        })
-      } else {
-        listContainer.innerHTML = ""
+
+    // Update Sub 2 Slot (index 1)
+    const slot1 = qs("#sub-slot-1");
+    if (slot1) {
+      const isSub1Loaded = !!data.names[1];
+      slot1.setAttribute("data-loaded", isSub1Loaded ? "true" : "false");
+      if (isSub1Loaded) {
+        const subName1 = qs("#sub-name-1");
+        if (subName1) {
+          subName1.textContent = data.names[1];
+          subName1.setAttribute("title", data.names[1]);
+        }
+        const subMeta1 = qs("#sub-meta-1");
+        if (subMeta1) {
+          const meta = data.subMeta && data.subMeta[1];
+          const ext = data.names[1].split('.').pop().toUpperCase();
+          const sizeStr = meta && meta.size ? ` • ${formatBytes(meta.size)}` : "";
+          subMeta1.textContent = `${meta && meta.format ? meta.format : ext}${sizeStr}`;
+        }
       }
     }
 
     if (states.tab !== "settings") {
         updateSettingsUI(overlay)
     }
-    if (states.tab !== "timing") {
+    if (states.tab !== "subtitles") {
       qs("#sync").value = Math.round((time.sync[states.activeSub] || 0) * 1000)
     }
     localStorage.setItem("settings", JSON.stringify(overlay))
@@ -199,7 +245,7 @@ chrome.runtime.onMessage.addListener(message => {
     if (lastData) lastData.time = message.data.time;
     const time = message.data.time;
     onTimingUpdate(time)
-    if (states.tab !== "timing" && document.activeElement !== qs("#sync")) { 
+    if (states.tab !== "subtitles" && document.activeElement !== qs("#sync")) { 
       qs("#sync").value = Math.round((time.sync[states.activeSub] || 0) * 1000) 
     }
     if (message.data.audio && document.activeElement !== qs("#audio-delay")) {
@@ -212,15 +258,31 @@ chrome.runtime.onMessage.addListener(message => {
   }
 })
 
-qs(".upload-tray").addEventListener("click", (e) => {
-  if (e.currentTarget.classList.contains("locked")) return;
-  sendMessage("upload");
-})
+qa(".slot-empty[data-slot]").forEach(slotBtn => {
+  slotBtn.addEventListener("click", () => {
+    const slotIdx = parseInt(slotBtn.getAttribute("data-slot"));
+    sendMessage("upload", { slot: slotIdx });
+  });
+});
+
+qa(".sub-slot .remove-btn").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    const idx = parseInt(e.currentTarget.getAttribute("data-index"));
+    sendMessage("remove", { index: idx });
+  });
+});
 
 const audioUploadTray = qs("#audio-upload-tray");
 if (audioUploadTray) {
   audioUploadTray.addEventListener("click", () => {
     sendMessage("audio_upload");
+  });
+}
+
+const uploadAudioRemoveBtn = qs("#upload-audio-remove-btn");
+if (uploadAudioRemoveBtn) {
+  uploadAudioRemoveBtn.addEventListener("click", () => {
+    sendMessage("audio_remove");
   });
 }
 
@@ -253,7 +315,7 @@ Array.from(qa(".tab")).forEach(tab => {
   tab.addEventListener("click", () => {
     states.tab = tab.classList[1]
     document.body.setAttribute("data-tab", states.tab)
-    if (states.tab === "timing" && lastData && lastData.data) {
+    if (states.tab === "subtitles" && lastData && lastData.data) {
         onTiming(lastData.data.subs[states.activeSub] || []);
         requestAnimationFrame(() => {
           requestAnimationFrame(scrollToActive);
@@ -271,7 +333,7 @@ qa(`input[name="activeSubTiming"], input[name="activeSubSettings"]`).forEach(rad
             updateSettingsUI(lastData.overlay);
             qs("#sync").value = Math.round((lastData.time.sync[states.activeSub] || 0) * 1000);
             
-            if (states.tab === "timing") {
+            if (states.tab === "subtitles") {
                 requestAnimationFrame(() => {
                   requestAnimationFrame(scrollToActive);
                 });
