@@ -150,24 +150,41 @@ function updateAudioUI(audio) {
     }
 }
 
+const updateVideoStatus = (hasVideo, duration = 0, current = 0) => {
+  const banner = qs("#upload-video-banner");
+  const statusText = qs("#status-text");
+  const previewTime = qs("#upload-preview-time");
+  
+  if (hasVideo) {
+    document.body.setAttribute("data-ready", "true");
+    if (banner) banner.setAttribute("data-video-ready", "true");
+    if (statusText) statusText.textContent = "Video connected";
+    if (previewTime) {
+      previewTime.textContent = `${toTimeString(current)} / ${toTimeString(duration)}`;
+    }
+  } else {
+    document.body.removeAttribute("data-ready");
+    if (banner) banner.setAttribute("data-video-ready", "false");
+    if (statusText) statusText.textContent = "No video detected";
+    if (previewTime) previewTime.textContent = "Open a video to play";
+  }
+};
+
 chrome.runtime.onMessage.addListener(message => {
   if (!message) { return }
   const type = message.type
   if (type === "info") {
     const id = message.id
     const data = message.data
-    if (states.iframe === null && data.target) {
-      if (data.duration > 60) {
-        const subTray = qs("#sub-upload-tray") || qs(".upload-tray");
-        if (subTray) subTray.classList.add("ready");
-        document.body.setAttribute("data-ready", "true")
-        states.iframe = { id, duration: data.duration }
-        const settings = JSON.parse(localStorage.getItem("settings") || "null")
-        if (settings && settings.version === "2.6") {
-          sendMessage("update", { outer: settings.outer.style, inner: [settings.inner[0].style, settings.inner[1].style] }).then(onInit)
-        } else {
-          sendMessage("data").then(onInit)
-        }
+    const hasVideo = !!(data && (data.hasVideo || data.target));
+    updateVideoStatus(hasVideo, data ? data.duration : 0, 0);
+    if (states.iframe === null && hasVideo) {
+      states.iframe = { id, duration: data.duration }
+      const settings = JSON.parse(localStorage.getItem("settings") || "null")
+      if (settings && settings.version === "2.6") {
+        sendMessage("update", { outer: settings.outer.style, inner: [settings.inner[0].style, settings.inner[1].style] }).then(onInit)
+      } else {
+        sendMessage("data").then(onInit)
       }
     }
     return
@@ -181,6 +198,9 @@ chrome.runtime.onMessage.addListener(message => {
     const time = message.data.time
     const overlay = message.data.overlay
     
+    const hasVideo = !!(data && (data.target || data.hasVideo)) || (time && (time.duration > 0 || time.current > 0));
+    updateVideoStatus(hasVideo, time ? time.duration : 0, time ? time.current : 0);
+
     if (states.tab === "upload" || states.tab === "subtitles") { 
         onTiming(data.subs[states.activeSub] || []) 
     }
@@ -246,11 +266,12 @@ chrome.runtime.onMessage.addListener(message => {
       qs("#sync").value = Math.round((time.sync[states.activeSub] || 0) * 1000)
     }
     localStorage.setItem("settings", JSON.stringify(overlay))
-    qs(".upload-preview-time").innerHTML = `${toTimeString(time.current)} / ${toTimeString(time.duration)}`
     
   } else if (type === "time") {
     if (lastData) lastData.time = message.data.time;
     const time = message.data.time;
+    const hasVideo = time && (time.duration > 0 || time.current > 0);
+    updateVideoStatus(hasVideo, time ? time.duration : 0, time ? time.current : 0);
     onTimingUpdate(time)
     if (states.tab !== "subtitles" && document.activeElement !== qs("#sync")) { 
       qs("#sync").value = Math.round((time.sync[states.activeSub] || 0) * 1000) 
@@ -261,7 +282,6 @@ chrome.runtime.onMessage.addListener(message => {
         audioDelayInput.value = Math.round((message.data.audio.delay || 0) * 1000);
       }
     }
-    qs(".upload-preview-time").innerHTML = `${toTimeString(time.current)} / ${toTimeString(time.duration)}`
   }
 })
 

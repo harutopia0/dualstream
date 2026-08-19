@@ -233,11 +233,15 @@ const update = () => {
 }
 const onElement = () => {
   const elements = Array.from(document.querySelectorAll("video"))
-  const durations = elements.map(item => item.duration).filter(item => !isNaN(item)).filter(item => item > 60)
-  if (durations.length === 0) { return }
-  const maximum = Math.max(...durations)
-  if (data.target && document.body.contains(data.target) && data.target.duration === maximum) { return }
-  const newTarget = elements.find(item => item.duration === maximum && document.body.contains(item))
+  const validElements = elements.filter(item => document.body.contains(item))
+  if (validElements.length === 0) { 
+    data.target = null;
+    return;
+  }
+  const durations = validElements.map(item => item.duration).filter(item => !isNaN(item) && item > 0)
+  const maximum = durations.length > 0 ? Math.max(...durations) : 0;
+  if (data.target && document.body.contains(data.target) && (maximum === 0 || data.target.duration === maximum)) { return }
+  const newTarget = (maximum > 0 ? validElements.find(item => item.duration === maximum) : null) || validElements[0]
   if (newTarget) {
     data.target = newTarget
     init()
@@ -444,7 +448,8 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     if (iframe.contentWindow) { iframe.contentWindow.postMessage(message, "*") }
   })
   if (action === "info") {
-    sendMessage("info", { target: data.target, duration: data.target ? data.target.duration : 0 })
+    const hasVideo = !!data.target && document.body.contains(data.target);
+    sendMessage("info", { hasVideo, target: hasVideo, duration: hasVideo && !isNaN(data.target.duration) ? data.target.duration : 0 })
     return callback(true)
   }
   if (message.id !== id) { return }

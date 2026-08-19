@@ -22,8 +22,12 @@
 
     <div class="sections">
         <div class="section upload" data-name="none" data-audio-loaded="false" data-audio-loading="false">
-            <div class="upload-preview">
-                <div class="upload-preview-time">00:00:00 / 00:00:00</div>
+            <div class="upload-video-banner" id="upload-video-banner" data-video-ready="false">
+                <div class="video-status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text" id="status-text">No video detected</span>
+                </div>
+                <div class="upload-preview-time" id="upload-preview-time">Open a video to play</div>
             </div>
 
             <!-- Card 1: Subtitles (Fixed 2-Slot Stack) -->

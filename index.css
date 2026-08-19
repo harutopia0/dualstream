@@ -129,6 +129,108 @@ body[data-ready] .tab.audio, body[data-ready] .tab.subtitles, body[data-ready] .
     height: 100%;
 }
 
+.upload-video-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 14px;
+    background-color: #f2f2f7;
+    border: 1px solid #e5e5ea;
+    border-radius: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 42px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.upload-video-banner[data-video-ready="false"] {
+    background-color: #fff9e6;
+    border-color: #ffe082;
+}
+
+.video-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: #34c759;
+    box-shadow: 0 0 6px rgba(52, 199, 89, 0.6);
+    flex-shrink: 0;
+}
+
+.upload-video-banner[data-video-ready="false"] .status-dot {
+    background-color: #ff9500;
+    box-shadow: 0 0 6px rgba(255, 149, 0, 0.5);
+}
+
+.status-text {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1c1c1e;
+    letter-spacing: 0.2px;
+}
+
+.upload-video-banner[data-video-ready="false"] .status-text {
+    color: #996500;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.upload-preview-time {
+    font-size: 20px;
+    font-weight: 700;
+    color: #000000 !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.5px;
+    font-family: "Ubuntu", sans-serif;
+}
+
+.upload-video-banner[data-video-ready="false"] .upload-preview-time {
+    color: #996500 !important;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* Lock all upload stacks completely when NO video is detected */
+body:not([data-ready]) .upload-card {
+    opacity: 0.6;
+    pointer-events: none;
+    user-select: none;
+}
+
+body:not([data-ready]) .slot-empty {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    border-color: #d8d8e0 !important;
+    background-color: #fafafc !important;
+}
+
+body:not([data-ready]) .slot-empty:hover {
+    border-color: #d8d8e0 !important;
+    background-color: #fafafc !important;
+}
+
+body:not([data-ready]) .slot-empty .slot-plus,
+body:not([data-ready]) .slot-empty:hover .slot-plus {
+    background-color: #e5e5ea !important;
+    color: #8e8e93 !important;
+    transform: none !important;
+}
+
+body:not([data-ready]) .slot-empty .slot-title {
+    color: #8e8e93 !important;
+}
+
+body:not([data-ready]) .slot-empty .slot-sub {
+    color: #aeaeb2 !important;
+}
+
 #app[data-tab="audio"] .sections {
     overflow-y: hidden;
 }
@@ -279,31 +381,6 @@ body[data-ready] .tab.audio, body[data-ready] .tab.subtitles, body[data-ready] .
     overflow: hidden;
     text-overflow: ellipsis;
 }
-
-.upload-preview {
-    display: flex;
-    width: 100%;
-    flex-direction: column;
-    border-radius: 10px;
-    background-color: #181818;
-    padding: 8px 14px;
-    box-sizing: border-box;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    min-height: 38px;
-}
-
-.upload-preview-time {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #FFF;
-    font-weight: 600;
-    font-size: 22px;
-    line-height: 22px;
-}
-
 /* Audio Slot States in Upload Tab */
 .section.upload[data-audio-loaded="false"][data-audio-loading="false"] #audio-upload-tray {
     display: flex !important;
