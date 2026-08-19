@@ -479,7 +479,14 @@ chrome.runtime.onMessage.addListener(async (message, _s, callback) => {
     const trackIdx = payload.trackIndex
     data.audio.selectedTrack = trackIdx
     if (audioEngine) {
-      audioEngine.selectTrack(trackIdx)
+      const trackName = data.audio.tracks && data.audio.tracks[trackIdx] ? (data.audio.tracks[trackIdx].name || `Track ${trackIdx + 1}`) : `Track ${trackIdx + 1}`;
+      showAudioToast("DualStream • Audio", `Switching to ${trackName}...`, "loading", 0);
+      try {
+        await audioEngine.selectTrack(trackIdx);
+        showAudioToast("DualStream • Audio", `Switched to ${trackName}`, "success", 2500);
+      } catch (err) {
+        showAudioToast("DualStream • Audio", `Failed to switch track: ${err.message || err}`, "error", 4000);
+      }
     }
     sendMessage("data", { data, time, overlay })
   } else if (action === "audio_update") {

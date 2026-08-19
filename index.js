@@ -109,12 +109,19 @@ function updateAudioUI(audio) {
         if (toggleEl) toggleEl.checked = !!audio.enabled;
 
         if (trackSelect) {
-            if (audio.tracks && audio.tracks.length > 0) {
-                trackSelect.innerHTML = audio.tracks.map((t, idx) => 
-                    `<option value="${idx}" ${idx === audio.selectedTrack ? 'selected' : ''}>${t.name || ('Track ' + (idx + 1))} (${t.language || 'UND'}, ${t.codec || 'Audio'}, ${t.channels || 'Stereo'})</option>`
-                ).join('');
-            } else {
-                trackSelect.innerHTML = `<option value="0">Track 1 (Default Audio)</option>`;
+            const currentOptionCount = trackSelect.options.length;
+            const newOptionCount = (audio.tracks && audio.tracks.length > 0) ? audio.tracks.length : 1;
+            if (currentOptionCount !== newOptionCount || trackSelect.getAttribute("data-file") !== audio.fileName) {
+                trackSelect.setAttribute("data-file", audio.fileName || "");
+                if (audio.tracks && audio.tracks.length > 0) {
+                    trackSelect.innerHTML = audio.tracks.map((t, idx) => 
+                        `<option value="${idx}" ${idx === audio.selectedTrack ? 'selected' : ''}>${t.name || ('Track ' + (idx + 1))} (${t.language || 'UND'}, ${t.codec || 'Audio'}, ${t.channels || 'Stereo'})</option>`
+                    ).join('');
+                } else {
+                    trackSelect.innerHTML = `<option value="0">Track 1 (Default Audio)</option>`;
+                }
+            } else if (document.activeElement !== trackSelect) {
+                trackSelect.value = audio.selectedTrack ?? 0;
             }
         }
         if (trackGroup) trackGroup.style.display = "flex";
