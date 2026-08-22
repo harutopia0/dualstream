@@ -144,7 +144,12 @@ const update = () => {
 
                 const innStyle = overlay.inner[i].style;
                 const fontSz = innStyle.fontSize ? (typeof innStyle.fontSize === 'number' ? `${innStyle.fontSize}px` : innStyle.fontSize) : '40px';
-                const posWrapperStyle = `position: absolute; left: ${left}; top: ${top}; transform: ${transform}; pointer-events: none; text-align: center; white-space: nowrap; font-size: ${fontSz}; color: ${innStyle.color || '#ffffff'}; font-weight: ${innStyle.fontWeight || 'normal'}; text-shadow: ${innStyle.textShadow || '0px 0px 10px #000'}; font-family: ${innStyle.fontFamily || 'sans-serif'};`;
+                const an = (s.pos && s.pos.alignment) || 2;
+                let textAlign = 'center';
+                if (an === 1 || an === 4 || an === 7) textAlign = 'left';
+                else if (an === 3 || an === 6 || an === 9) textAlign = 'right';
+
+                const posWrapperStyle = `position: absolute; left: ${left}; top: ${top}; transform: ${transform}; pointer-events: none; text-align: ${textAlign}; max-width: 90%; width: max-content; box-sizing: border-box; white-space: normal; word-break: break-word; overflow-wrap: break-word; font-size: ${fontSz}; color: ${innStyle.color || '#ffffff'}; font-weight: ${innStyle.fontWeight || 'normal'}; text-shadow: ${innStyle.textShadow || '0px 0px 10px #000'}; font-family: ${innStyle.fontFamily || 'sans-serif'};`;
                 allPosMarkup += `<div style="${posWrapperStyle}">${html}</div>`;
             });
             

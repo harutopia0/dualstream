@@ -1,10 +1,9 @@
-# DualStream (Enhanced Version)
+# DualStream
 
 - **Author:** harutopia0
-- **Original Creator:** Deshan Nawanjana
 
 ## Description
-**DualStream** is a powerful browser extension that enables seamless streaming with **dual subtitles** and **local audio replacement** on any HTML5 video player. Special thanks to Deshan Nawanjana for creating the original amazing platform.
+**DualStream** is a powerful browser extension that enables seamless streaming with **dual subtitles** and **local audio replacement** on any HTML5 video player.
 
 ## Features
 - **Dual Subtitles**: Upload and display up to 2 subtitle files simultaneously (ASS, SRT, VTT) with full bilingual styling and positioning.
@@ -42,6 +41,7 @@ git clone https://github.com/harutopia0/dualstream
 1. Click on the Extension icon on the Chrome toolbar to open **DualStream**.
 2. **Upload tab**: Upload subtitle files (up to 2 files simultaneously for bilingual display) and local audio files (MKV, MP4, MP3, etc.).
 3. **Audio tab**: Configure audio replacement settings (track selection, volume, audio delay sync, stream/buffer engine modes).
-4. **Subtitles tab**: Fine-tune subtitle sync offsets and view live subtitle lines with one-click timing synchronization.
-5. **Settings tab**: Customize subtitle appearance, colors, fonts, shadows, and screen positions.
+4. **Subtitles tab**:
+   - **Timing view**: Fine-tune subtitle sync offsets and view live subtitle lines with one-click timing synchronization.
+   - **Position & Style view**: Customize global screen positions, vertical/horizontal spacing, font sizes, weights, colors, text shadows, and background opacities.
 

@@ -27,7 +27,7 @@ const sendMessage = (action, payload = null) => {
   })
 }
 
-const states = { tab: "upload", lines: [], time: null, iframe: null, activeSub: 0 }
+const states = { tab: "upload", subview: "timing", lines: [], time: null, iframe: null, activeSub: 0 }
 let lastData = null; 
 
 function updateSettingsUI(overlay) {
@@ -259,11 +259,11 @@ chrome.runtime.onMessage.addListener(message => {
       }
     }
 
-    if (states.tab !== "settings") {
-        updateSettingsUI(overlay)
-    }
-    if (states.tab !== "subtitles") {
-      qs("#sync").value = Math.round((time.sync[states.activeSub] || 0) * 1000)
+    updateSettingsUI(overlay)
+    if (states.tab !== "subtitles" || states.subview !== "timing") {
+      if (document.activeElement !== qs("#sync")) {
+        qs("#sync").value = Math.round((time.sync[states.activeSub] || 0) * 1000)
+      }
     }
     localStorage.setItem("settings", JSON.stringify(overlay))
     
@@ -273,7 +273,7 @@ chrome.runtime.onMessage.addListener(message => {
     const hasVideo = time && (time.duration > 0 || time.current > 0);
     updateVideoStatus(hasVideo, time ? time.duration : 0, time ? time.current : 0);
     onTimingUpdate(time)
-    if (states.tab !== "subtitles" && document.activeElement !== qs("#sync")) { 
+    if ((states.tab !== "subtitles" || states.subview !== "timing") && document.activeElement !== qs("#sync")) { 
       qs("#sync").value = Math.round((time.sync[states.activeSub] || 0) * 1000) 
     }
     if (message.data.audio && document.activeElement !== qs("#audio-delay")) {
@@ -342,14 +342,46 @@ Array.from(qa(".tab")).forEach(tab => {
   tab.addEventListener("click", () => {
     states.tab = tab.classList[1]
     document.body.setAttribute("data-tab", states.tab)
-    if (states.tab === "subtitles" && lastData && lastData.data) {
+    if (states.tab === "subtitles") {
+      if (lastData) {
+        if (lastData.overlay) updateSettingsUI(lastData.overlay);
+        if (lastData.data) onTiming(lastData.data.subs[states.activeSub] || []);
+      }
+      if (states.subview === "timing") {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(scrollToActive);
+        });
+      }
+    }
+  })
+})
+
+qa(".view-pill").forEach(pill => {
+  pill.addEventListener("click", () => {
+    const subview = pill.getAttribute("data-subview") || "timing";
+    states.subview = subview;
+    
+    qa(".view-pill").forEach(p => p.classList.toggle("active", p === pill));
+    
+    const subSection = qs(".section.subtitles");
+    if (subSection) {
+      subSection.setAttribute("data-subview", subview);
+    }
+    
+    if (subview === "timing") {
+      if (lastData && lastData.data) {
         onTiming(lastData.data.subs[states.activeSub] || []);
         requestAnimationFrame(() => {
           requestAnimationFrame(scrollToActive);
         });
+      }
+    } else if (subview === "style") {
+      if (lastData && lastData.overlay) {
+        updateSettingsUI(lastData.overlay);
+      }
     }
-  })
-})
+  });
+});
 
 qa(`input[name="activeSubTiming"], input[name="activeSubSettings"]`).forEach(radio => {
     radio.addEventListener("change", (e) => {
@@ -360,7 +392,7 @@ qa(`input[name="activeSubTiming"], input[name="activeSubSettings"]`).forEach(rad
             updateSettingsUI(lastData.overlay);
             qs("#sync").value = Math.round((lastData.time.sync[states.activeSub] || 0) * 1000);
             
-            if (states.tab === "subtitles") {
+            if (states.tab === "subtitles" && states.subview === "timing") {
                 requestAnimationFrame(() => {
                   requestAnimationFrame(scrollToActive);
                 });

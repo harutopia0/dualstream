@@ -401,10 +401,33 @@ function parseLines(text, ext) {
         const end = parts[1].trim().split(" ")[0]
         current.from = parseTime(start)
         current.to = parseTime(end)
+        current.pos = null
       } else if (line) {
-        if (/{\\an[789]/.test(line) || /{\\a[567](?!\d)/.test(line)) {
-          line = line.replace(/{\\an[789]}/g, "").replace(/{\\a[567]}/g, "")
+        const anMatch = line.match(/{\\an([1-9])}/);
+        const aMatch = line.match(/{\\a([1-9]|10|11)}/);
+        let align = null;
+        if (anMatch) {
+          align = parseInt(anMatch[1], 10);
+        } else if (aMatch) {
+          const aVal = parseInt(aMatch[1], 10);
+          const aToAn = { 1: 1, 2: 2, 3: 3, 5: 7, 6: 8, 7: 9, 9: 4, 10: 5, 11: 6 };
+          if (aToAn[aVal]) align = aToAn[aVal];
         }
+        
+        if (align) {
+          if (align >= 7 && align <= 9) {
+            const pctMap = { 7: 5, 8: 50, 9: 95 };
+            current.pos = { alignment: align, leftPercent: pctMap[align], topPercent: 5 };
+          } else if (align >= 4 && align <= 6) {
+            const pctMap = { 4: 5, 5: 50, 6: 95 };
+            current.pos = { alignment: align, leftPercent: pctMap[align], topPercent: 50 };
+          } else if (align >= 1 && align <= 3 && align !== 2) {
+            const pctMap = { 1: 5, 2: 50, 3: 95 };
+            current.pos = { alignment: align, leftPercent: pctMap[align], topPercent: 95 };
+          }
+        }
+        
+        line = line.replace(/{\\an[1-9]}/g, "").replace(/{\\a(?:[1-9]|10|11)}/g, "");
         current.text = (current.text ? current.text + "<br>" : "") + line
       } else if (current.text) {
         current.text = current.text.trim();

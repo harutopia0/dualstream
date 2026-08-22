@@ -17,7 +17,6 @@
         <div class="tab upload">Upload</div>
         <div class="tab audio">Audio</div>
         <div class="tab subtitles">Subtitles</div>
-        <div class="tab settings">Settings</div>
     </div>
 
     <div class="sections">
@@ -158,7 +157,7 @@
 
                     <div class="audio-control-group">
                         <div class="timing-sync-container">
-                            <div class="timing-sync-desc" id="audio-delay-reset">Audio Delay (in ms), click here to reset</div>
+                            <div class="timing-sync-desc" id="audio-delay-reset">Synchronization amount (in ms), click here to reset</div>
                             <div class="timing-sync">
                                 <button class="sync-btn audio-sync-btn size-1000" data-audio-amount="-1000">-1s</button>
                                 <button class="sync-btn audio-sync-btn size-500" data-audio-amount="-500">-500</button>
@@ -192,95 +191,103 @@
             </div>
         </div>
 
-        <div class="section subtitles">
+        <div class="section subtitles" data-subview="timing">
+            <!-- Subview Switcher: Segmented Pill -->
+            <div class="subview-switcher">
+                <button class="view-pill active" data-subview="timing">Timing</button>
+                <button class="view-pill" data-subview="style">Position & Style</button>
+            </div>
+
+            <!-- Sub 1 / Sub 2 Active Selector -->
             <div class="sub-selector">
                 <label class="radio-label sub1"><input type="radio" name="activeSubTiming" value="0" checked> Sub 1</label>
                 <label class="radio-label sub2"><input type="radio" name="activeSubTiming" value="1"> Sub 2</label>
             </div>
-            <div class="timing-sync-container">
-                <div class="timing-sync-desc" id="sync-reset">Synchronization amount (in ms), click here to reset</div>
-                <div class="timing-sync">
-                    <button class="sync-btn size-1000" data-amount="-1000">-1s</button>
-                    <button class="sync-btn size-500" data-amount="-500">-500</button>
-                    <button class="sync-btn size-100" data-amount="-100">-100</button>
-                    <input class="timing-sync-input" type="text" id="sync">
-                    <button class="sync-btn size-100" data-amount="100">+100</button>
-                    <button class="sync-btn size-500" data-amount="500">+500</button>
-                    <button class="sync-btn size-1000" data-amount="1000">+1s</button>
+
+            <!-- Subview Panel 1: Timing -->
+            <div class="subview-panel subview-timing">
+                <div class="timing-sync-container">
+                    <div class="timing-sync-desc" id="sync-reset">Synchronization amount (in ms), click here to reset</div>
+                    <div class="timing-sync">
+                        <button class="sync-btn size-1000" data-amount="-1000">-1s</button>
+                        <button class="sync-btn size-500" data-amount="-500">-500</button>
+                        <button class="sync-btn size-100" data-amount="-100">-100</button>
+                        <input class="timing-sync-input" type="text" id="sync">
+                        <button class="sync-btn size-100" data-amount="100">+100</button>
+                        <button class="sync-btn size-500" data-amount="500">+500</button>
+                        <button class="sync-btn size-1000" data-amount="1000">+1s</button>
+                    </div>
                 </div>
+                <div class="timing-lines"></div>
             </div>
-            <div class="timing-lines"></div>
-        </div>
-        <div class="section settings">
-            <fieldset id="settings" data-position="end-center" data-weight="normal">
-                <div class="settings-section">
-                    <div class="settings-section-title">Position (Global)</div>
-                    <div class="settings-section-content position">
-                        <div class="position-box">
-                            <div class="position-row">
-                                <input type="button" id="position" value="start-start">
-                                <input type="button" id="position" value="start-center">
-                                <input type="button" id="position" value="start-end">
+
+            <!-- Subview Panel 2: Style & Position -->
+            <div class="subview-panel subview-style">
+                <fieldset id="settings" data-position="end-center" data-weight="normal">
+                    <div class="settings-section">
+                        <div class="settings-section-title">Position (Global)</div>
+                        <div class="settings-section-content position">
+                            <div class="position-box">
+                                <div class="position-row">
+                                    <input type="button" id="position" value="start-start">
+                                    <input type="button" id="position" value="start-center">
+                                    <input type="button" id="position" value="start-end">
+                                </div>
+                                <div class="position-row">
+                                    <input type="button" id="position" value="center-start">
+                                    <input type="button" id="position" value="center-center">
+                                    <input type="button" id="position" value="center-end">
+                                </div>
+                                <div class="position-row">
+                                    <input type="button" id="position" value="end-start">
+                                    <input type="button" id="position" value="end-center">
+                                    <input type="button" id="position" value="end-end">
+                                </div>
                             </div>
-                            <div class="position-row">
-                                <input type="button" id="position" value="center-start">
-                                <input type="button" id="position" value="center-center">
-                                <input type="button" id="position" value="center-end">
+                            <div class="spacing-box">
+                                <label class="spacing-x">Vertical Spacing<input id="spacing-x" type="range" min="0" max="300"></label>
+                                <label class="spacing-y">Horizontal Spacing<input id="spacing-y" type="range" min="0" max="300"></label>
                             </div>
-                            <div class="position-row">
-                                <input type="button" id="position" value="end-start">
-                                <input type="button" id="position" value="end-center">
-                                <input type="button" id="position" value="end-end">
-                            </div>
-                        </div>
-                        <div class="spacing-box">
-                            <label class="spacing-x">Vertical Spacing<input id="spacing-x" type="range" min="0" max="300"></label>
-                            <label class="spacing-y">Horizontal Spacing<input id="spacing-y" type="range" min="0" max="300"></label>
                         </div>
                     </div>
-                </div>
 
-                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 5px 0;" />
+                    <hr class="settings-divider" />
 
-                <div class="sub-selector">
-                    <label class="radio-label sub1"><input type="radio" name="activeSubSettings" value="0" checked> Sub 1</label>
-                    <label class="radio-label sub2"><input type="radio" name="activeSubSettings" value="1"> Sub 2</label>
-                </div>
-
-                <div class="settings-sections-row">
-                    <div class="settings-section font-weight">
-                        <div class="settings-section-title">Font Weight</div>
-                        <div class="font-weight-box">
-                            <input type="button" id="font-weight" value="Lighter">
-                            <input type="button" id="font-weight" value="Normal">
-                            <input type="button" id="font-weight" value="Bolder">
+                    <div class="settings-sections-row">
+                        <div class="settings-section font-weight">
+                            <div class="settings-section-title">Font Weight</div>
+                            <div class="font-weight-box">
+                                <input type="button" id="font-weight" value="Lighter">
+                                <input type="button" id="font-weight" value="Normal">
+                                <input type="button" id="font-weight" value="Bolder">
+                            </div>
+                        </div>
+                        <div class="settings-section text-color">
+                            <div class="settings-section-title">Text Color</div>
+                            <div class="text-color-box">
+                                <input type="color" id="text-color" value="#ffffff">
+                            </div>
                         </div>
                     </div>
-                    <div class="settings-section text-color">
-                        <div class="settings-section-title">Text Color</div>
-                        <div class="text-color-box">
-                            <input type="color" id="text-color" value="#ffffff">
-                        </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">Font Size</div>
+                        <label class="font-size"><input id="font-size" type="range" min="10" max="80"></label>
                     </div>
-                </div>
-                <div class="settings-section">
-                    <div class="settings-section-title">Font Size</div>
-                    <label class="font-size"><input id="font-size" type="range" min="10" max="80"></label>
-                </div>
-                <div class="settings-section">
-                    <div class="settings-section-title">Text Shadow</div>
-                    <label class="text-shadow"><input id="text-shadow" type="range" min="0" max="30"></label>
-                </div>
-                <div class="settings-section">
-                    <div class="settings-section-title">Background Opacity</div>
-                    <label class="background-opacity"><input id="background-opacity" type="range" min="0" max="100"></label>
-                </div>
-            </fieldset>
+                    <div class="settings-section">
+                        <div class="settings-section-title">Text Shadow</div>
+                        <label class="text-shadow"><input id="text-shadow" type="range" min="0" max="30"></label>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">Background Opacity</div>
+                        <label class="background-opacity"><input id="background-opacity" type="range" min="0" max="100"></label>
+                    </div>
+                </fieldset>
+            </div>
         </div>
     </div>
     <div class="footer">
-        <div class="footer-title">Modified by harutopia0</div>
-        <div class="footer-original">Original SubStream by Deshan Nawanjana</div>
+        <div class="footer-title">DualStream by harutopia0</div>
+        <div class="footer-link"><a href="https://github.com/harutopia0/dualstream" target="_blank">View Source Code on GitHub</a></div>
     </div>
 </body>
 </html>
